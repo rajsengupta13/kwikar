@@ -381,6 +381,76 @@ footer{background:#0c1629;color:rgba(255,255,255,.65);padding:64px 5% calc(28px 
 /* ══ MOBILE TOP BAR (phones only — hidden on desktop) ══ */
 .mobile-topbar{display:none}
 
+/* ══ WELCOME / FIRST-VISIT PINCODE MODAL ══ */
+.welcome-modal{
+  position:fixed;inset:0;z-index:700;
+  background:rgba(12,22,41,.65);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+.welcome-modal.show{display:flex;animation:welcomeFade .3s ease}
+@keyframes welcomeFade{from{opacity:0}to{opacity:1}}
+.welcome-panel{
+  background:#fff;border-radius:24px;width:100%;max-width:420px;
+  padding:32px 26px 26px;text-align:center;
+  box-shadow:0 30px 80px rgba(0,0,0,.4);
+  animation:welcomeIn .45s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes welcomeIn{from{opacity:0;transform:translateY(20px) scale(.94)}to{opacity:1;transform:none}}
+.welcome-icon{font-size:3rem;margin-bottom:10px;line-height:1;animation:wbob .6s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes wbob{from{transform:scale(.5);opacity:0}to{transform:none;opacity:1}}
+.welcome-panel h2{font-size:1.4rem;font-weight:800;color:var(--text);margin-bottom:8px;letter-spacing:-.4px;line-height:1.2}
+.welcome-panel p{font-size:.86rem;color:var(--sub);line-height:1.55;margin-bottom:18px}
+.welcome-input{
+  width:100%;height:52px;border:2px solid var(--border);border-radius:14px;
+  padding:0 16px;font-family:inherit;font-size:1.1rem;font-weight:700;
+  text-align:center;letter-spacing:4px;color:var(--text);background:var(--bg);
+  outline:none;transition:all .2s;
+}
+.welcome-input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px rgba(24,73,214,.12)}
+.welcome-input.no{border-color:var(--red);background:#fef2f2;animation:shake .35s}
+.welcome-error{
+  display:none;font-size:.78rem;color:var(--red);font-weight:600;margin-top:8px;
+}
+.welcome-error.show{display:block}
+.welcome-btn{
+  width:100%;height:50px;margin-top:14px;
+  background:linear-gradient(135deg,var(--blue),#3b7bf6);
+  color:#fff;border:none;border-radius:13px;
+  font-family:inherit;font-size:.95rem;font-weight:800;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 6px 20px rgba(24,73,214,.32);
+}
+.welcome-btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 28px rgba(24,73,214,.42)}
+.welcome-btn:disabled{opacity:.6;cursor:wait}
+.welcome-skip{
+  display:block;margin:11px auto 0;
+  background:none;border:none;color:var(--sub);
+  font-family:inherit;font-size:.78rem;font-weight:600;
+  cursor:pointer;padding:6px 12px;
+}
+.welcome-skip:hover{color:var(--blue)}
+.welcome-form-state,.welcome-success-state{display:none}
+.welcome-form-state.show,.welcome-success-state.show{display:block;animation:fadeUp .4s ease}
+.welcome-success-state .ws-img{
+  width:120px;height:120px;object-fit:contain;
+  margin:0 auto 14px;display:block;
+  animation:wbob .5s cubic-bezier(.2,1.5,.4,1) both;
+}
+.welcome-success-state h3{font-size:1.4rem;font-weight:800;color:var(--text);margin-bottom:18px;letter-spacing:-.4px;line-height:1.2}
+
+@media(max-width:640px){
+  .welcome-panel{padding:26px 20px 22px;border-radius:20px}
+  .welcome-icon{font-size:2.5rem}
+  .welcome-panel h2{font-size:1.15rem}
+  .welcome-panel p{font-size:.76rem;margin-bottom:14px}
+  .welcome-input{height:46px;font-size:1rem !important;letter-spacing:3px;border-radius:12px}
+  .welcome-btn{height:44px;font-size:.85rem;border-radius:12px;margin-top:11px}
+  .welcome-success-state .ws-img{width:96px;height:96px;margin-bottom:12px}
+  .welcome-success-state h3{font-size:1.15rem;margin-bottom:14px}
+}
+
 /* ══ TECHNICIAN MODAL ══ */
 .tech-modal{
   position:fixed;inset:0;z-index:500;
@@ -1114,6 +1184,26 @@ body.modal-open{overflow:hidden}
   <button class="put-btn" onclick="updateSW()">Update Now</button>
 </div>
 
+<!-- ══ WELCOME MODAL — first-visit pincode capture ══ -->
+<div class="welcome-modal" id="welcomeModal" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+  <div class="welcome-panel">
+    <div class="welcome-form-state show" id="welcomeFormState">
+      <div class="welcome-icon">📍</div>
+      <h2 id="welcomeTitle">Welcome to Kwikar!</h2>
+      <p>Enter your pincode so we can show you the right service options for your area.</p>
+      <input type="tel" class="welcome-input" id="welcomePincode" placeholder="6-digit Pincode" maxlength="6" inputmode="numeric" autocomplete="postal-code">
+      <div class="welcome-error" id="welcomeError"></div>
+      <button type="button" class="welcome-btn" id="welcomeSubmit">Continue →</button>
+      <button type="button" class="welcome-skip" id="welcomeSkip">Skip for now</button>
+    </div>
+    <div class="welcome-success-state" id="welcomeSuccessState">
+      <img src="icons/technician.jpg" alt="" class="ws-img" id="ws-img">
+      <h3 id="ws-title">Welcome to Kwikar!</h3>
+      <button type="button" class="welcome-btn" id="welcomeContinue">Continue to site →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ PUSH NOTIFICATION PROMPT ══ -->
 <div id="push-prompt">
   <div class="pp-header">
@@ -1585,6 +1675,100 @@ body.modal-open{overflow:hidden}
 </footer>
 
 <script>
+/* ══════════ WELCOME MODAL — opens every page load, saves to MySQL ══════════ */
+(function(){
+  const modal=document.getElementById('welcomeModal');
+  const formState=document.getElementById('welcomeFormState');
+  const successState=document.getElementById('welcomeSuccessState');
+  const input=document.getElementById('welcomePincode');
+  const submitBtn=document.getElementById('welcomeSubmit');
+  const skipBtn=document.getElementById('welcomeSkip');
+  const continueBtn=document.getElementById('welcomeContinue');
+  const errorEl=document.getElementById('welcomeError');
+
+  function showError(msg){
+    errorEl.textContent=msg;
+    errorEl.classList.add('show');
+    input.classList.add('no');
+    setTimeout(()=>input.classList.remove('no'),400);
+  }
+  function clearError(){
+    errorEl.textContent='';
+    errorEl.classList.remove('show');
+    input.classList.remove('no');
+  }
+  function openWelcome(){
+    /* Always reset to the form state when (re)opening */
+    successState.classList.remove('show');
+    formState.classList.add('show');
+    input.value='';
+    clearError();
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+    setTimeout(()=>input.focus({preventScroll:true}),350);
+  }
+  function closeWelcome(){
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+  }
+
+  /* Sanitize input — digits only */
+  input.addEventListener('input',()=>{
+    input.value=input.value.replace(/\D/g,'').slice(0,6);
+    clearError();
+  });
+  input.addEventListener('keydown',e=>{if(e.key==='Enter')submitBtn.click()});
+
+  submitBtn.addEventListener('click',async()=>{
+    const pin=input.value.trim();
+    if(!/^\d{6}$/.test(pin)){
+      showError('Please enter a valid 6-digit pincode');
+      return;
+    }
+    clearError();
+    submitBtn.disabled=true;
+    const originalText=submitBtn.textContent;
+    submitBtn.textContent='Checking…';
+
+    try{
+      const res=await fetch('api/visit',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({pincode:pin})
+      });
+      const data=await res.json();
+      if(!res.ok||data.error){
+        showError(data.error||'Something went wrong — please try again');
+        return;
+      }
+      /* Show static welcome — backend response stored but not displayed */
+      formState.classList.remove('show');
+      successState.classList.add('show');
+      /* Pre-fill the pincode in the in-page checker too */
+      const pinIn=document.getElementById('pinIn');
+      if(pinIn)pinIn.value=pin;
+    }catch(err){
+      console.error('[visit]',err);
+      showError('Could not connect to server — please try again');
+    }finally{
+      submitBtn.disabled=false;
+      submitBtn.textContent=originalText;
+    }
+  });
+
+  skipBtn.addEventListener('click',closeWelcome);
+  continueBtn.addEventListener('click',closeWelcome);
+  modal.addEventListener('click',e=>{if(e.target===modal)closeWelcome()});
+
+  /* Open on every page load — small delay so the page paints first */
+  function autoOpen(){setTimeout(openWelcome,600)}
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',autoOpen);
+  } else {
+    autoOpen();
+  }
+})();
+
 /* ══════════ CAROUSEL ══════════ */
 let cur=0,total=3,timer;
 const track=document.getElementById('carouselTrack');
