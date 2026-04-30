@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════
+# Kwikar — root URL routing
+#
+# When user visits /kwiker2/  →  serves frontend/index.html
+# When user requests /kwiker2/manifest.json (or any asset)
+#   that does not exist at the requested path  →  serves it
+#   from frontend/ transparently (no redirect, URL stays clean)
+# When user requests /kwiker2/api/booking (etc)  →  routes to
+#   backend/api/booking.php
+# ═══════════════════════════════════════════════════════════
+
+Options -Indexes
+DirectoryIndex frontend/index.html
+
+RewriteEngine On
+
+# 1. If the requested file or directory actually exists, serve it directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# 2. /api/<name>  →  /backend/api/<name>.php
+RewriteRule ^api/([A-Za-z0-9_-]+)/?$ backend/api/$1.php [L,QSA]
+
+# 3. Everything else (relative asset paths, missing files) is served
+#    from the frontend/ folder. Internal rewrite — URL does not change.
+RewriteRule ^(.*)$ frontend/$1 [L]
+
+# Force UTF-8 for served HTML/CSS/JS
+AddDefaultCharset UTF-8
+
+# Reasonable cache headers for static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType text/css "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+  ExpiresByType application/manifest+json "access plus 7 days"
+</IfModule>
+
+# Service workers must always be re-validated; never cache stale.
+<FilesMatch "sw\.js$">
+  Header set Cache-Control "no-cache, no-store, must-revalidate"
+</FilesMatch>
