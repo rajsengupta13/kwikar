@@ -7,20 +7,17 @@
      • Form data      → Background Sync queue
 ═══════════════════════════════════════════════ */
 
-const CACHE_STATIC  = 'kwikar-static-v1';
-const CACHE_IMAGES  = 'kwikar-images-v1';
-const CACHE_PAGES   = 'kwikar-pages-v1';
+const CACHE_STATIC  = 'kwikar-static-v1.2.5';
+const CACHE_IMAGES  = 'kwikar-images-v1.2.5';
+const CACHE_PAGES   = 'kwikar-pages-v1.2.5';
 const ALL_CACHES    = [CACHE_STATIC, CACHE_IMAGES, CACHE_PAGES];
-const OFFLINE_URL   = '/offline.html';
+const OFFLINE_URL   = 'offline.html';
 
+const BASE = self.registration.scope;
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
+  BASE + 'index.html',
+  BASE + 'offline.html',
+  BASE + 'manifest.json',
 ];
 
 /* ── INSTALL ── */
@@ -55,7 +52,7 @@ self.addEventListener('fetch', event => {
   // ── Images (Unsplash + icons) → Stale While Revalidate
   if (
     url.hostname.includes('unsplash.com') ||
-    url.pathname.startsWith('/icons/')
+    url.pathname.startsWith('/images/icons/')
   ) {
     event.respondWith(staleWhileRevalidate(request, CACHE_IMAGES));
     return;
@@ -148,15 +145,15 @@ self.addEventListener('push', event => {
   const data = event.data?.json() || {
     title: 'Kwikar',
     body: 'We are launching in Bhagalpur soon! 🚀',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-72.png',
+    icon: '/images/icons/icon-192.png',
+    badge: '/images/icons/icon-72.png',
   };
 
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: data.icon || '/icons/icon-192.png',
-      badge: data.badge || '/icons/icon-72.png',
+      icon: data.icon || '/images/icons/icon-192.png',
+      badge: data.badge || '/images/icons/icon-72.png',
       tag: 'kwikar-notification',
       renotify: true,
       data: { url: data.url || '/' },

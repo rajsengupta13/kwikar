@@ -2,8 +2,8 @@
   "name": "Kwikar — Home Appliance Repair Bhagalpur",
   "short_name": "Kwikar",
   "description": "Book verified home appliance repair technicians at your doorstep. Launching in Bhagalpur on 26 May 2026.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/mono-kwikar/frontend/",
+  "scope": "/mono-kwikar/frontend/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#1849d6",
@@ -18,31 +18,31 @@
       "short_name": "Pincode",
       "description": "Check if Kwikar is launching in your area",
       "url": "/#pincode",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "images/icons/icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Join as Technician",
       "short_name": "Join Tech",
       "description": "Register as a Kwikar technician",
       "url": "/#technician",
-      "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [{ "src": "images/icons/icon-96.png", "sizes": "96x96" }]
     }
   ],
   "icons": [
-    { "src": "icons/icon-72.png",      "sizes": "72x72",   "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-96.png",      "sizes": "96x96",   "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-128.png",     "sizes": "128x128", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-144.png",     "sizes": "144x144", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-152.png",     "sizes": "152x152", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-192.png",     "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-384.png",     "sizes": "384x384", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png",     "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "images/icons/icon-72.png",      "sizes": "72x72",   "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-96.png",      "sizes": "96x96",   "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-128.png",     "sizes": "128x128", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-144.png",     "sizes": "144x144", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-152.png",     "sizes": "152x152", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-192.png",     "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-384.png",     "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/icon-512.png",     "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "images/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "screenshots": [
     {
-      "src": "icons/icon-512.png",
+      "src": "images/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "form_factor": "narrow",
