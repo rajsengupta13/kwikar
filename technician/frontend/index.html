@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kwiker Technician</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    :root {
+        /* User Provided Palette - Used for Branding & Dark Elements */
+        --brand-darkest: #060e20;
+        --brand-dark: #0d1b3e;
+        --brand-medium: #152444;
+        --brand-accent: #1a3a6e;
+
+        /* Light Theme Variables */
+        --bg-body: #f4f6f9;
+        --bg-card: #ffffff;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+
+        /* Functional Colors */
+        --primary: var(--brand-accent);
+        --primary-hover: var(--brand-dark);
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+
+        --sidebar-width: 220px;
+        --header-height: 60px;
+        --radius: 12px;
+        --transition: all 0.3s ease;
+        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-body);
+        color: var(--text-main);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+    }
+
+    /* --- Utilities --- */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 8px; }
+    .gap-4 { gap: 16px; }
+    .w-full { width: 100%; }
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; }
+    .font-bold { font-weight: 700; }
+    .text-muted { color: var(--text-muted); }
+    .mt-4 { margin-top: 16px; }
+    .mb-4 { margin-bottom: 16px; }
+    .p-4 { padding: 16px; }
+
+    /* --- Components --- */
+    button { cursor: pointer; font-family: inherit; transition: var(--transition); }
+
+    .btn-primary {
+        background-color: var(--brand-accent);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: var(--radius);
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .btn-primary:hover { background-color: var(--brand-dark); transform: translateY(-1px); }
+
+    .btn-outline {
+        background-color: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        padding: 10px 20px;
+        border-radius: var(--radius);
+        font-weight: 500;
+        font-size: 14px;
+    }
+    .btn-outline:hover { border-color: var(--brand-accent); color: var(--brand-accent); background: #f8fafc; }
+
+    .btn-danger {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+        border: 1px solid var(--danger);
+        padding: 8px 16px;
+        border-radius: var(--radius);
+    }
+
+    input, select, textarea {
+        width: 100%;
+        padding: 12px;
+        background-color: #fff;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        color: var(--text-main);
+        font-size: 14px;
+        transition: var(--transition);
+    }
+    input:focus, select:focus, textarea:focus {
+        border-color: var(--brand-accent);
+        box-shadow: 0 0 0 3px rgba(26, 58, 110, 0.1);
+    }
+    label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 13px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .card {
+        background-color: var(--bg-card);
+        border-radius: var(--radius);
+        padding: 24px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+    .badge-success { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    .badge-warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .badge-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+    .badge-info { background: rgba(26, 58, 110, 0.1); color: var(--brand-accent); }
+
+    .logo-icon {
+        width: 60px; height: 60px;
+        background: var(--brand-accent);
+        color: white;
+        border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 28px; font-weight: bold;
+        margin: 0 auto 20px;
+    }
+    .sidebar .logo-icon {
+        width: 36px; height: 36px;
+        border-radius: 10px;
+        font-size: 18px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+    /* --- App Layout --- */
+    #page-app {
+        display: flex;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+        width: var(--sidebar-width);
+        background-color: var(--brand-darkest);
+        color: white;
+        border-right: 1px solid rgba(255,255,255,0.05);
+        display: flex;
+        flex-direction: column;
+        padding: 14px 12px;
+        transition: transform 0.3s ease;
+        z-index: 100;
+        flex-shrink: 0;
+    }
+    .sidebar-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .logo-text strong { display: block; font-size: 15px; color: white; }
+    .logo-text span { font-size: 11px; color: rgba(255,255,255,0.6); }
+
+    .nav-menu { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .nav-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 12px;
+        color: rgba(255,255,255,0.7);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: var(--transition);
+        font-weight: 500;
+        font-size: 13px;
+    }
+    .nav-item:hover { background-color: rgba(255,255,255,0.1); color: white; }
+    .nav-item.active { background-color: var(--brand-accent); color: white; }
+    .nav-item i { width: 16px; text-align: center; font-size: 13px; }
+
+    .sidebar-footer { margin-top: auto; padding-top: 12px; }
+    .help-card {
+        background: var(--brand-medium);
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .help-card h4 { margin: 6px 0 3px; font-size: 12px; }
+    .help-card p { font-size: 11px; opacity: 0.8; margin-bottom: 8px; }
+    .help-card a { color: #60a5fa; font-size: 11px; text-decoration: underline; }
+
+    /* Main Content */
+    .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background-color: var(--bg-body);
+    }
+
+    /* Topbar */
+    .topbar {
+        height: var(--header-height);
+        padding: 0 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border-color);
+        background-color: white;
+    }
+    .menu-toggle { display: none; background: none; border: none; color: var(--text-main); font-size: 20px; }
+    .topbar-left h1 { font-size: 20px; font-weight: 700; color: var(--brand-dark); }
+    .topbar-left p { font-size: 13px; color: var(--text-muted); }
+
+    .topbar-right { display: flex; align-items: center; gap: 20px; }
+    .notification-btn {
+        background: #f1f5f9; border: none;
+        width: 40px; height: 40px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--brand-dark); position: relative;
+    }
+    .dot {
+        position: absolute; top: 8px; right: 8px;
+        width: 8px; height: 8px; background: var(--danger);
+        border-radius: 50%; border: 2px solid white;
+    }
+    .user-profile { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+    .user-profile img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--brand-accent); }
+    .user-profile .info { line-height: 1.2; }
+    .user-profile .info strong { display: block; font-size: 14px; color: var(--brand-dark); }
+    .user-profile .info span { font-size: 11px; color: var(--text-muted); }
+
+    /* Scrollable Area */
+    .content-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px;
+    }
+    .content-scroll::-webkit-scrollbar { width: 6px; }
+    .content-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    /* Dashboard Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        box-shadow: var(--shadow);
+    }
+    .stat-info h3 { font-size: 24px; margin: 8px 0; color: var(--brand-dark); }
+    .stat-info p { font-size: 13px; color: var(--text-muted); }
+    .stat-icon {
+        width: 40px; height: 40px;
+        background: rgba(26, 58, 110, 0.1);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--brand-accent);
+    }
+
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+    }
+    @media (max-width: 1024px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+    .section-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 16px;
+    }
+    .section-header h2 { font-size: 18px; font-weight: 700; color: var(--brand-dark); }
+    .section-header a { font-size: 13px; color: var(--brand-accent); text-decoration: none; font-weight: 600; }
+
+    /* Schedule List */
+    .schedule-item {
+        display: flex; gap: 16px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: var(--radius);
+        margin-bottom: 12px;
+        border-left: 4px solid var(--brand-accent);
+        transition: var(--transition);
+    }
+    .schedule-item:hover { background: white; box-shadow: var(--shadow); }
+    .schedule-time {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-width: 60px;
+        background: white;
+        padding: 8px; border-radius: 8px;
+        font-size: 12px; color: var(--text-muted);
+        border: 1px solid var(--border-color);
+    }
+    .schedule-time strong { font-size: 16px; color: var(--brand-dark); margin-top: 4px; }
+    .schedule-details h4 { font-size: 15px; margin-bottom: 4px; color: var(--brand-dark); }
+    .schedule-details p { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+
+    /* Earnings Mini */
+    .earnings-mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .wallet-balance {
+        background: linear-gradient(135deg, var(--brand-accent), var(--brand-dark));
+        padding: 20px; border-radius: var(--radius);
+        color: white;
+        box-shadow: 0 10px 15px -3px rgba(13, 27, 62, 0.3);
+    }
+    .wallet-balance .label { font-size: 12px; opacity: 0.9; }
+    .wallet-balance h2 { font-size: 28px; margin: 8px 0 16px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
+    .tab {
+        padding: 10px 0;
+        font-size: 14px; font-weight: 600;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: var(--transition);
+    }
+    .tab:hover { color: var(--brand-dark); }
+    .tab.active { color: var(--brand-accent); border-bottom-color: var(--brand-accent); }
+
+    /* Job Cards */
+    .job-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 20px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        box-shadow: var(--shadow);
+    }
+    .job-info h3 { font-size: 16px; margin-bottom: 4px; color: var(--brand-dark); }
+    .job-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+    .job-meta span { display: flex; align-items: center; gap: 4px; }
+    .job-actions { display: flex; gap: 10px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; background: white; }
+    th, td { padding: 16px; text-align: left; border-bottom: 1px solid var(--border-color); }
+    th { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; background: #f8fafc; font-weight: 600; }
+    td { font-size: 14px; color: var(--text-main); }
+    tr:last-child td { border-bottom: none; }
+
+    /* Notifications */
+    .notif-item {
+        display: flex; gap: 16px;
+        padding: 16px;
+        border-bottom: 1px solid var(--border-color);
+        background: white;
+        transition: background 0.2s;
+    }
+    .notif-item:hover { background: #f8fafc; }
+    .notif-item.unread { background: rgba(26, 58, 110, 0.04); border-left: 3px solid var(--brand-accent); }
+    .notif-icon {
+        width: 40px; height: 40px;
+        background: #f1f5f9;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        color: var(--brand-accent);
+    }
+    .notif-content h4 { font-size: 14px; margin-bottom: 4px; color: var(--brand-dark); }
+    .notif-content p { font-size: 13px; color: var(--text-muted); }
+    .notif-time { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Support Grid */
+    .support-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+    .support-card {
+        background: white;
+        padding: 24px;
+        border-radius: var(--radius);
+        text-align: center;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow);
+    }
+    .support-card .icon {
+        width: 50px; height: 50px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px;
+        margin: 0 auto 16px;
+    }
+    .support-card .icon.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    .support-card .icon.blue { background: rgba(26, 58, 110, 0.1); color: var(--brand-accent); }
+    .support-card .icon.orange { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .support-card .icon.purple { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+    .support-card h3 { font-size: 16px; margin-bottom: 8px; color: var(--brand-dark); }
+    .support-card p { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+
+    /* Settings */
+    .settings-grid { display: grid; grid-template-columns: 250px 1fr; gap: 24px; }
+    .settings-tabs { display: flex; flex-direction: column; gap: 4px; }
+    .settings-tab {
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--text-muted);
+        transition: var(--transition);
+        font-weight: 500;
+    }
+    .settings-tab:hover { background: white; color: var(--brand-dark); }
+    .settings-tab.active { background: var(--brand-accent); color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+    .profile-photo {
+        width: 100px; height: 100px;
+        border-radius: 50%;
+        overflow: hidden;
+        position: relative;
+        cursor: pointer;
+        border: 3px solid var(--brand-accent);
+    }
+    .profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-edit {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 4px;
+        text-align: center;
+        font-size: 12px;
+    }
+
+    /* Toggles */
+    .toggle {
+        width: 44px; height: 24px;
+        background: #cbd5e1;
+        border-radius: 12px;
+        position: relative;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    .toggle::after {
+        content: '';
+        position: absolute; top: 2px; left: 2px;
+        width: 18px; height: 18px;
+        background: white;
+        border-radius: 50%;
+        transition: var(--transition);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .toggle.active { background: var(--brand-accent); }
+    .toggle.active::after { left: 22px; }
+
+    /* Modals */
+    .modal {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(6, 14, 32, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal.open { display: flex; }
+    .modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        width: 90%; max-width: 500px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+    .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+
+    .cropper-stage {
+        width: 100%; height: 300px;
+        background: #f1f5f9;
+        border-radius: var(--radius);
+        overflow: hidden;
+        position: relative;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .cropper-stage img { max-width: 100%; max-height: 100%; }
+
+    /* Mobile Nav */
+    .mobile-nav {
+        position: fixed; bottom: 0; left: 0; width: 100%;
+        background: white;
+        border-top: 1px solid var(--border-color);
+        z-index: 90;
+        display: none;
+        box-shadow: 0 -4px 6px -1px rgba(0,0,0,0.05);
+    }
+    .mobile-nav-items { display: flex; justify-content: space-around; padding: 10px 0; }
+    .mobile-nav-item {
+        display: flex; flex-direction: column; align-items: center;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 11px;
+        gap: 4px;
+    }
+    .mobile-nav-item.active { color: var(--brand-accent); }
+    .mobile-nav-icon { font-size: 20px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .sidebar { position: fixed; left: -220px; height: 100%; }
+        .sidebar.open { left: 0; }
+        .sidebar .help-card { display: none; }
+        .menu-toggle { display: block; }
+        .main-content { padding-bottom: 70px; }
+        .content-scroll { padding: 16px; }
+        .mobile-nav { display: block; }
+        .settings-grid { grid-template-columns: 1fr; }
+        .settings-tabs { flex-direction: row; overflow-x: auto; padding-bottom: 10px; }
+        .settings-tab { white-space: nowrap; }
+        .earnings-mini-grid { grid-template-columns: 1fr; }
+        .topbar { padding: 0 16px; }
+        .topbar-left h1 { font-size: 16px; }
+        .topbar-left p { display: none; }
+        .user-profile .info { display: none; }
+    }
+    @media (max-width: 480px) {
+        .content-scroll { padding: 12px; }
+        .card { padding: 14px; }
+        .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    }
+</style>
+</head>
+<body>
+
+<!-- APP -->
+<div id="page-app">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon">K</div>
+            <div class="logo-text"><strong>Kwiker</strong><span>Technician</span></div>
+        </div>
+        <nav class="nav-menu" id="navMenu">
+            <!-- Generated by JS -->
+        </nav>
+        <div class="sidebar-footer">
+            <button class="btn-outline w-full" onclick="logout()" style="margin-bottom: 10px; border-color:rgba(255,255,255,0.2); color:white;">⎋ Logout</button>
+            <div class="help-card">
+                <div style="font-size: 24px; color:#60a5fa;">✓</div>
+                <h4>You're verified</h4>
+                <p>Great work! You are verified.</p>
+                <a href="#" onclick="navigate('settings');return false;">View Profile</a>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="topbar">
+            <div class="flex items-center gap-4">
+                <button class="menu-toggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <div class="topbar-left">
+                    <h1 id="topbarTitle">Good morning 👋</h1>
+                    <p id="topbarSub">Here's what's happening today.</p>
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button class="notification-btn" onclick="navigate('notifications')">
+                    <i class="fas fa-bell"></i>
+                    <span class="dot" id="notifBadge" style="display:none"></span>
+                </button>
+                <div class="user-profile" onclick="navigate('settings')">
+                    <img src="" id="topbarAvatar" alt="Profile">
+                    <div class="info">
+                        <strong id="topbarName">...</strong>
+                        <span>Technician</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="content-scroll">
+            <!-- DASHBOARD -->
+            <div id="sec-dashboard" class="section">
+                <div class="stats-grid" id="statsGrid"></div>
+                <div class="dashboard-grid">
+                    <div>
+                        <div class="card mb-4">
+                            <div class="section-header"><h2>Today's Schedule</h2><a href="#" onclick="navigate('jobs');return false;">View All</a></div>
+                            <div class="schedule-list" id="scheduleList"></div>
+                        </div>
+                        <div class="card">
+                            <div class="section-header"><h2>Earnings (Wallet)</h2><a href="#" onclick="navigate('wallet');return false;">View All</a></div>
+                            <div class="earnings-mini-grid">
+                                <div class="wallet-balance">
+                                    <p class="label">Available Balance</p>
+                                    <h2 id="dashAvailBal">₹ 0</h2>
+                                    <button class="btn-outline" style="background:rgba(255,255,255,0.2); border:none; color:white; font-size:12px;" onclick="navigate('wallet')">Withdraw</button>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-2" style="padding-bottom:8px; border-bottom:1px solid var(--border-color);"><span class="text-sm text-muted">Today's Earnings</span><strong id="dashTodayE">₹ 0</strong></div>
+                                    <div class="flex justify-between mb-2" style="padding-bottom:8px; border-bottom:1px solid var(--border-color);"><span class="text-sm text-muted">This Month</span><strong id="dashMonthE">₹ 0</strong></div>
+                                    <div class="flex justify-between"><span class="text-sm text-muted">Total Withdrawn</span><strong id="dashWithdrawnE">₹ 0</strong></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="card mb-4">
+                            <div class="section-header"><h2>My Jobs</h2><a href="#" onclick="navigate('jobs');return false;">View All</a></div>
+                            <div class="tabs">
+                                <div class="tab" onclick="navigate('jobs','new')">New (<span id="dashNewC">0</span>)</div>
+                                <div class="tab active">Ongoing (<span id="dashOngC">0</span>)</div>
+                                <div class="tab" onclick="navigate('jobs','completed')">Done (<span id="dashComC">0</span>)</div>
+                            </div>
+                            <div id="dashOngoingJobs"></div>
+                        </div>
+                        <div class="card" id="dashRecentNotifs">
+                            <div class="section-header"><h2>Recent Alerts</h2></div>
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JOBS -->
+            <div id="sec-jobs" class="section hidden">
+                <div class="tabs" id="jobTabs"></div>
+                <div id="jobsList"></div>
+            </div>
+
+            <!-- EARNINGS -->
+            <div id="sec-earnings" class="section hidden">
+                <div class="stats-grid" id="earningStats"></div>
+                <div class="dashboard-grid mb-4">
+                    <div class="card">
+                        <div class="section-header"><h2>Earnings Overview</h2><span class="text-xs text-muted">This Month</span></div>
+                        <canvas id="earningsChart" height="120"></canvas>
+                    </div>
+                    <div class="card">
+                        <h2 class="text-lg mb-4" style="color:var(--brand-dark)">Earnings Summary</h2>
+                        <div class="flex flex-col items-center">
+                            <div style="position:relative; width:150px; height:150px; border-radius:50%; background:conic-gradient(var(--brand-accent) 0% 70%, #e2e8f0 70% 100%); display:flex; align-items:center; justify-content:center;">
+                                <div style="width:110px; height:110px; background:white; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:inset 0 2px 4px rgba(0,0,0,0.05);">
+                                    <small class="text-muted">Total</small>
+                                    <strong id="donutTotal" style="color:var(--brand-dark)">₹0</strong>
+                                </div>
+                            </div>
+                            <ul class="w-full mt-4 text-sm" id="donutLegend">
+                                <li class="flex justify-between mb-2"><span><span style="color:var(--brand-accent)">●</span> Completed Jobs</span> <strong>70%</strong></li>
+                                <li class="flex justify-between"><span><span style="color:#e2e8f0">●</span> Pending/Bonus</span> <strong>30%</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="section-header"><h2>Recent Transactions</h2></div>
+                        <div id="earningsRecentTxns"></div>
+                    </div>
+                    <div class="card">
+                        <h2 class="text-lg mb-4" style="color:var(--brand-dark)">Wallet Actions</h2>
+                        <div class="wallet-balance mb-4"><p class="label">Available Balance</p><h2 id="earningsWalletBal">₹ 0</h2></div>
+                        <button class="btn-primary w-full mb-2" onclick="navigate('wallet')">Withdraw Money</button>
+                        <button class="btn-outline w-full" onclick="navigate('settings')">Payment Settings</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WALLET -->
+            <div id="sec-wallet" class="section hidden">
+                <div class="dashboard-grid mb-4">
+                    <div class="wallet-balance">
+                        <p class="label">Available Balance</p>
+                        <h2 id="walletAvailBal">₹ 0</h2>
+                        <button class="btn-outline" style="background:rgba(255,255,255,0.1); border:none; color:white; margin-top:10px;" onclick="openWithdraw()">Withdraw Money</button>
+                    </div>
+                    <div class="card">
+                        <p class="label text-muted">This Month Earnings</p>
+                        <h2 id="walletMonthE" style="font-size:26px;margin:8px 0; color:var(--brand-dark)">₹ 0</h2>
+                        <small style="color:var(--success);">↑ 18% from last month</small>
+                    </div>
+                    <div class="card">
+                        <p class="label text-muted">Pending Payout</p>
+                        <h2 id="walletPendingE" style="font-size:26px;margin:8px 0; color:var(--brand-dark)">₹ 0</h2>
+                        <small class="text-muted">Will be paid on 31st of month</small>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="section-header"><h2>Transaction History</h2></div>
+                    <div style="overflow-x:auto;">
+                        <table id="txnTable">
+                            <thead><tr><th>Date</th><th>ID</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+                            <tbody id="txnBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOTIFICATIONS -->
+            <div id="sec-notifications" class="section hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 style="color:var(--brand-dark)">Notifications</h2>
+                    <a href="#" onclick="markAllRead();return false;" style="color:var(--brand-accent);font-size:13px;">Mark all as read</a>
+                </div>
+                <div id="notifList"></div>
+            </div>
+
+            <!-- SUPPORT -->
+            <div id="sec-support" class="section hidden">
+                <h2 class="text-xl mb-2" style="color:var(--brand-dark)">Support Center</h2>
+                <p class="text-muted mb-4">How can we help you?</p>
+                <div class="support-grid">
+                    <div class="support-card"><div class="icon green"><i class="fas fa-comment-dots"></i></div><h3>Chat with us</h3><p>Get instant help from our support team</p><button class="btn-outline w-full" onclick="startChat()">Start Chat</button></div>
+                    <div class="support-card"><div class="icon blue"><i class="fas fa-phone"></i></div><h3>Call us</h3><p>Speak with our support executive</p><button class="btn-outline w-full" onclick="callSupport()">Call Now</button></div>
+                    <div class="support-card"><div class="icon orange"><i class="fas fa-ticket-alt"></i></div><h3>Raise a Ticket</h3><p>Raise a ticket and we will get back to you</p><button class="btn-outline w-full" onclick="openTicket()">Raise Ticket</button></div>
+                    <div class="support-card"><div class="icon purple"><i class="fas fa-question-circle"></i></div><h3>FAQs</h3><p>Find answers to common questions</p><button class="btn-outline w-full" onclick="viewAllTopics()">View FAQs</button></div>
+                </div>
+                <div class="dashboard-grid mb-4">
+                    <div class="card">
+                        <div class="section-header"><h2>Your Recent Tickets</h2></div>
+                        <div id="ticketsList"></div>
+                    </div>
+                    <div class="card">
+                        <div class="section-header"><h2>Popular Help Topics</h2></div>
+                        <div class="flex flex-col gap-2">
+                            <div onclick="alert('Help: How to accept a job?')" class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"><i class="fas fa-chevron-right text-xs text-muted"></i><span>How to accept a job?</span></div>
+                            <div onclick="alert('Help: Earnings calculation')" class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"><i class="fas fa-chevron-right text-xs text-muted"></i><span>How are my earnings calculated?</span></div>
+                            <div onclick="alert('Help: Payout timing')" class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"><i class="fas fa-chevron-right text-xs text-muted"></i><span>When will I get my payout?</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div id="sec-settings" class="section hidden">
+                <div class="settings-grid">
+                    <div class="settings-tabs">
+                        <div class="settings-tab active" onclick="showSettingsTab('profile',this)">Profile Settings</div>
+                        <div class="settings-tab" onclick="showSettingsTab('bank',this)">Bank Details</div>
+                        <div class="settings-tab" onclick="showSettingsTab('app',this)">App Preferences</div>
+                        <div class="settings-tab" onclick="showSettingsTab('security',this)">Privacy & Security</div>
+                        <div class="settings-tab" onclick="showSettingsTab('password',this)">Change Password</div>
+                        <div class="settings-tab" onclick="showSettingsTab('about',this)">About Kwiker</div>
+                    </div>
+                    <div>
+                        <!-- Profile Tab -->
+                        <div id="tab-profile" class="settings-section">
+                            <div class="card">
+                                <h3 class="mb-4" style="color:var(--brand-dark)">Profile Settings</h3>
+                                <div class="flex flex-col items-center mb-4">
+                                    <div class="profile-photo" onclick="document.getElementById('profileImageInput').click()">
+                                        <img src="" id="profileImg" alt="Profile">
+                                        <div class="photo-edit"><i class="fas fa-camera"></i></div>
+                                    </div>
+                                    <input type="file" id="profileImageInput" accept="image/*" style="display:none" onchange="handleProfileImageChange(event)">
+                                </div>
+                                <div class="dashboard-grid">
+                                    <div class="form-group"><label>Full Name</label><input type="text" id="fullName" placeholder="Your full name"></div>
+                                    <div class="form-group"><label>Mobile Number</label><input type="text" id="mobile" placeholder="+91 XXXXX XXXXX"></div>
+                                    <div class="form-group"><label>Email ID</label><input type="email" id="settingsEmail" placeholder="you@example.com"></div>
+                                    <div class="form-group"><label>Service Category</label>
+                                        <select id="serviceCategory">
+                                            <option value="">Select technician type</option>
+                                            <option>AC Technician</option><option>Electrician</option><option>Plumber</option><option>Carpenter</option>
+                                            <option>RO Technician</option><option>Refrigerator Technician</option><option>Washing Machine Technician</option>
+                                            <option>Microwave Technician</option><option>Geyser Technician</option><option>TV Technician</option>
+                                            <option>CCTV Technician</option><option>Computer Technician</option><option>Laptop Technician</option>
+                                            <option>Mobile Technician</option><option>Printer Technician</option><option>Inverter Technician</option>
+                                            <option>Solar Technician</option><option>Pest Control Technician</option><option>Painter</option>
+                                            <option>Mason</option><option>Welder</option><option>Locksmith</option><option>General Handyman</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label>Experience</label>
+                                        <select id="experience"><option value="">Select experience</option><option>0-1 Year</option><option>2-3 Years</option><option>3+ Years</option></select>
+                                    </div>
+                                    <div class="form-group"><label>State</label><input type="text" id="state" placeholder="State"></div>
+                                    <div class="form-group"><label>City</label><input type="text" id="city" placeholder="City"></div>
+                                </div>
+                                <button class="btn-primary mt-4" onclick="saveProfile()">Save Profile</button>
+                            </div>
+                        </div>
+
+                        <!-- Bank Tab -->
+                        <div id="tab-bank" class="settings-section hidden">
+                            <div class="card">
+                                <h3 class="mb-4" style="color:var(--brand-dark)">Bank Details</h3>
+                                <div class="dashboard-grid">
+                                    <div class="form-group"><label>Account Holder Name</label><input type="text" id="accountHolder" placeholder="As per bank records"></div>
+                                    <div class="form-group"><label>Account Number</label><input type="text" id="accountNumber" placeholder="xxxx xxxx xxxx xxxx"></div>
+                                    <div class="form-group"><label>IFSC Code</label><input type="text" id="ifscCode" placeholder="e.g. HDFC0001234"></div>
+                                    <div class="form-group"><label>Bank Name</label><input type="text" id="bankName" placeholder="e.g. HDFC Bank"></div>
+                                    <div class="form-group"><label>UPI ID</label><input type="text" id="upiId" placeholder="name@bank"></div>
+                                </div>
+                                <button class="btn-primary mt-4" onclick="saveBank()">Save Bank Details</button>
+                            </div>
+                        </div>
+
+                        <!-- App Tab -->
+                        <div id="tab-app" class="settings-section hidden">
+                            <div class="card">
+                                <h3 class="mb-4" style="color:var(--brand-dark)">App Preferences</h3>
+                                <div class="form-group mb-4"><label>Language</label>
+                                    <select id="langSelect"><option>English</option><option>Hindi</option><option>Tamil</option><option>Telugu</option><option>Marathi</option></select>
+                                </div>
+                                <div class="flex justify-between items-center py-3 border-t border-b border-gray-200 mb-4">
+                                    <div><span class="font-medium">Offline Mode</span><br><small class="text-muted">Enable to work in low network areas</small></div>
+                                    <div class="toggle" id="toggleOffline" onclick="toggleSwitch(this)"></div>
+                                </div>
+                                <button class="btn-primary" onclick="saveAppSettings()">Save Preferences</button>
+                            </div>
+                        </div>
+
+                        <!-- Security Tab -->
+                        <div id="tab-security" class="settings-section hidden">
+                            <div class="card mb-4">
+                                <h3 class="mb-4" style="color:var(--brand-dark)">Privacy & Security</h3>
+                                <div class="flex justify-between items-center py-3 border-b border-gray-200"><div><span class="font-medium">Two-Step Verification</span><br><small class="text-muted">Add an extra layer of security</small></div><div class="toggle" id="toggle2FA" onclick="toggleSwitch(this)"></div></div>
+                                <div class="flex justify-between items-center py-3 cursor-pointer"><div><span class="font-medium">Login Activity</span><br><small class="text-muted">View recent login sessions</small></div><i class="fas fa-chevron-right text-muted"></i></div>
+                            </div>
+                            <div class="card" style="border:1px solid rgba(239, 68, 68, 0.3);">
+                                <h3 style="color:var(--danger); margin-bottom:4px;">Danger Zone</h3>
+                                <p class="text-muted text-sm mb-4">These actions are permanent and cannot be undone.</p>
+                                <div class="flex justify-between items-center flex-wrap gap-2">
+                                    <div><strong>Delete Account</strong><br><small class="text-muted">Permanently delete your account and all data</small></div>
+                                    <button class="btn-danger">Delete Account</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Tab -->
+                        <div id="tab-password" class="settings-section hidden">
+                            <div class="card">
+                                <h3 class="mb-4" style="color:var(--brand-dark)">Change Password</h3>
+                                <div class="form-group"><label>Current Password</label><input type="password" id="oldPassword" placeholder="Enter current password"></div>
+                                <div class="form-group"><label>New Password</label><input type="password" id="newPassword" placeholder="Enter new password (min 6 chars)"></div>
+                                <div class="form-group"><label>Confirm New Password</label><input type="password" id="confirmPassword" placeholder="Re-enter new password"></div>
+                                <button class="btn-primary mt-4" onclick="changePassword()">Change Password</button>
+                            </div>
+                        </div>
+
+                        <!-- About Tab -->
+                        <div id="tab-about" class="settings-section hidden">
+                            <div class="card text-center">
+                                <div class="logo-icon mx-auto mb-4">K</div>
+                                <h2 style="color:var(--brand-dark)">Kwiker Technician</h2>
+                                <p class="text-muted">Version 1.0.0</p>
+                                <p class="text-muted text-xs mt-2">© 2026 Kwiker Technologies</p>
+                                <div class="mt-4 pt-4 border-t border-gray-200 flex justify-between cursor-pointer"><span>Terms of Service</span><i class="fas fa-chevron-right text-muted"></i></div>
+                                <div class="py-3 border-b border-gray-200 flex justify-between cursor-pointer"><span>Privacy Policy</span><i class="fas fa-chevron-right text-muted"></i></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Mobile Nav -->
+<nav class="mobile-nav" id="mobileNav">
+    <div class="mobile-nav-items">
+        <a href="#" class="mobile-nav-item active" data-sec="dashboard" onclick="navigate('dashboard');return false;"><span class="mobile-nav-icon"><i class="fas fa-home"></i></span><span>Home</span></a>
+        <a href="#" class="mobile-nav-item" data-sec="jobs" onclick="navigate('jobs');return false;"><span class="mobile-nav-icon"><i class="fas fa-briefcase"></i></span><span>Jobs</span></a>
+        <a href="#" class="mobile-nav-item" data-sec="earnings" onclick="navigate('earnings');return false;"><span class="mobile-nav-icon"><i class="fas fa-coins"></i></span><span>Earn</span></a>
+        <a href="#" class="mobile-nav-item" data-sec="wallet" onclick="navigate('wallet');return false;"><span class="mobile-nav-icon"><i class="fas fa-wallet"></i></span><span>Wallet</span></a>
+        <a href="#" class="mobile-nav-item" data-sec="notifications" onclick="navigate('notifications');return false;"><span class="mobile-nav-icon"><i class="fas fa-bell"></i></span><span>Alerts</span></a>
+    </div>
+</nav>
+
+<!-- Modals -->
+<div class="modal" id="withdrawModal">
+    <div class="modal-content">
+        <h3 style="color:var(--brand-dark)">Withdraw Money</h3>
+        <p class="text-muted text-sm mb-4">Available: ₹<span id="modalBal">0</span></p>
+        <div class="form-group"><label>Enter Amount</label><input type="number" id="withdrawAmt" placeholder="₹ 0"></div>
+        <div class="modal-actions"><button class="btn-outline flex-1" onclick="closeModal('withdrawModal')">Cancel</button><button class="btn-primary flex-1" onclick="submitWithdraw()">Withdraw</button></div>
+    </div>
+</div>
+
+<div class="modal" id="ticketModal">
+    <div class="modal-content">
+        <h3 style="color:var(--brand-dark)">Raise a Ticket</h3>
+        <div class="form-group"><label>Subject</label><input type="text" id="ticketSubject" placeholder="Issue subject"></div>
+        <div class="form-group"><label>Description</label><textarea id="ticketDesc" rows="4" placeholder="Describe your issue..."></textarea></div>
+        <div class="modal-actions"><button class="btn-outline flex-1" onclick="closeModal('ticketModal')">Cancel</button><button class="btn-primary flex-1" onclick="submitTicket()">Submit</button></div>
+    </div>
+</div>
+
+<script>
+    // --- Data & State ---
+    // --- Auth guard: must come from main site with autologin param ---
+    (function(){
+      const p = new URLSearchParams(location.search);
+      if(p.get('autologin') === '1'){
+        window._autoLoginParams = {
+          name:  decodeURIComponent(p.get('name')  || 'Technician'),
+          phone: decodeURIComponent(p.get('phone') || ''),
+          email: decodeURIComponent(p.get('email') || ''),
+          role:  decodeURIComponent(p.get('role')  || 'Technician')
+        };
+        history.replaceState(null,'',location.pathname);
+      } else {
+        // Not redirected from main site — send back to login
+        window.location.replace('/mono-kwikar/frontend/index.html');
+      }
+    })();
+
+    const state = {
+        user: {
+            name:       (window._autoLoginParams?.name)  || "Ravi Kumar",
+            email:      (window._autoLoginParams?.email) || "ravikumar@gmail.com",
+            phone:      (window._autoLoginParams?.phone) || "+91 98765 43210",
+            role:       (window._autoLoginParams?.role)  || "AC Technician",
+            experience: "3+ Years",
+            avatar: "https://i.pravatar.cc/150?img=12",
+            balance: 12500,
+            pending: 3200,
+            withdrawn: 45000
+        },
+        jobs: [
+            { id: 1, title: "AC Repair - Split Unit", customer: "Amit Sharma", location: "Sector 12, Noida", time: "10:00 AM", date: "Today", status: "ongoing", price: 850 },
+            { id: 2, title: "Washing Machine Service", customer: "Priya Singh", location: "Block A, Dwarka", time: "02:30 PM", date: "Today", status: "new", price: 600 },
+            { id: 3, title: "Fridge Not Cooling", customer: "Rajesh Verma", location: "Lajpat Nagar", time: "Yesterday", date: "Yesterday", status: "completed", price: 1200 },
+            { id: 4, title: "Microwave Repair", customer: "Sunita Devi", location: "Mayur Vihar", time: "Tomorrow", date: "Tomorrow", status: "new", price: 450 },
+        ],
+        transactions: [
+            { id: "TXN1001", date: "2026-05-06", desc: "Job Payment #1023", amount: 850, status: "Success" },
+            { id: "TXN1002", date: "2026-05-05", desc: "Job Payment #1021", amount: 1200, status: "Success" },
+            { id: "TXN1003", date: "2026-05-01", desc: "Monthly Payout", amount: 15000, status: "Success" },
+            { id: "TXN1004", date: "2026-04-28", desc: "Bonus", amount: 500, status: "Success" },
+        ],
+        notifications: [
+            { id: 1, title: "New Job Assigned", msg: "You have a new job request for AC Repair.", time: "10 mins ago", read: false, type: "job" },
+            { id: 2, title: "Payment Received", msg: "₹1,200 credited to your wallet.", time: "2 hours ago", read: true, type: "money" },
+            { id: 3, title: "System Update", msg: "App version 1.0.1 is available.", time: "1 day ago", read: true, type: "system" },
+        ]
+    };
+
+    // --- Navigation ---
+    const navItems = [
+        { id: 'dashboard', icon: 'fa-home', label: 'Dashboard' },
+        { id: 'jobs', icon: 'fa-briefcase', label: 'Jobs' },
+        { id: 'earnings', icon: 'fa-chart-line', label: 'Earnings' },
+        { id: 'wallet', icon: 'fa-wallet', label: 'Wallet' },
+        { id: 'notifications', icon: 'fa-bell', label: 'Notifications' },
+        { id: 'support', icon: 'fa-headset', label: 'Support' },
+        { id: 'settings', icon: 'fa-cog', label: 'Settings' },
+    ];
+
+    function initNav() {
+        const menu = document.getElementById('navMenu');
+        menu.innerHTML = navItems.map(item => `
+            <a href="#" class="nav-item ${item.id === 'dashboard' ? 'active' : ''}" onclick="navigate('${item.id}'); return false;">
+                <i class="fas ${item.icon}"></i> ${item.label}
+            </a>
+        `).join('');
+        // Sync UI fields with state.user (important for auto-login)
+        const tn = document.getElementById('topbarName');
+        if(tn) tn.innerText = state.user.name;
+        const fn = document.getElementById('fullName');
+        if(fn) fn.value = state.user.name;
+        const mob = document.getElementById('mobile');
+        if(mob) mob.value = state.user.phone;
+        const se = document.getElementById('settingsEmail');
+        if(se) se.value = state.user.email;
+        updateAvatars();
+    }
+
+    function navigate(sectionId, subTab = null) {
+        document.querySelectorAll('.section').forEach(el => el.classList.add('hidden'));
+        const target = document.getElementById(`sec-${sectionId}`);
+        if(target) target.classList.remove('hidden');
+
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const activeNav = document.querySelector(`.nav-item[onclick*="${sectionId}"]`);
+        if(activeNav) activeNav.classList.add('active');
+
+        document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+        const activeMob = document.querySelector(`.mobile-nav-item[data-sec="${sectionId}"]`);
+        if(activeMob) activeMob.classList.add('active');
+
+        if(window.innerWidth <= 768) {
+            document.getElementById('sidebar').classList.remove('open');
+        }
+
+        if(sectionId === 'dashboard') { loadLiveData().then(renderDashboard); }
+        if(sectionId === 'jobs') { loadJobs().then(() => renderJobs(subTab || 'new')); }
+        if(sectionId === 'earnings') renderEarnings();
+        if(sectionId === 'wallet') renderWallet();
+        if(sectionId === 'notifications') { loadNotifications().then(renderNotifications); }
+        if(sectionId === 'support') renderSupport();
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // --- Rendering Functions ---
+
+    function renderDashboard() {
+        document.getElementById('statsGrid').innerHTML = `
+            <div class="stat-card">
+                <div class="stat-info"><p>Total Jobs</p><h3>${state.jobs.length}</h3></div>
+                <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info"><p>Rating</p><h3>4.8 <span class="text-xs text-muted">★</span></h3></div>
+                <div class="stat-icon" style="color:var(--warning); background:rgba(245,158,11,0.1);"><i class="fas fa-star"></i></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info"><p>Completion</p><h3>98%</h3></div>
+                <div class="stat-icon" style="color:var(--success); background:rgba(16,185,129,0.1);"><i class="fas fa-check-circle"></i></div>
+            </div>
+        `;
+
+        const todayJobs = state.jobs.filter(j => j.date === 'Today' || j.date === 'Tomorrow');
+        document.getElementById('scheduleList').innerHTML = todayJobs.map(job => `
+            <div class="schedule-item">
+                <div class="schedule-time">
+                    <span>${job.date === 'Today' ? 'TODAY' : 'TOM'}</span>
+                    <strong>${job.time}</strong>
+                </div>
+                <div class="schedule-details">
+                    <h4>${job.title}</h4>
+                    <p><i class="fas fa-map-marker-alt"></i> ${job.location}</p>
+                    <span class="badge ${job.status === 'ongoing' ? 'badge-info' : 'badge-warning'}">${job.status.toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('') || '<p class="text-muted text-center py-4">No jobs scheduled for today.</p>';
+
+        document.getElementById('dashAvailBal').innerText = `₹ ${state.user.balance.toLocaleString()}`;
+        document.getElementById('dashTodayE').innerText = `₹ ${state.transactions.filter(t=>t.date==='2026-05-06').reduce((a,b)=>a+b.amount,0)}`;
+        document.getElementById('dashMonthE').innerText = `₹ ${(state.user.balance + state.user.pending).toLocaleString()}`;
+        document.getElementById('dashWithdrawnE').innerText = `₹ ${state.user.withdrawn.toLocaleString()}`;
+
+        document.getElementById('dashNewC').innerText = state.jobs.filter(j=>j.status==='new').length;
+        document.getElementById('dashOngC').innerText = state.jobs.filter(j=>j.status==='ongoing').length;
+        document.getElementById('dashComC').innerText = state.jobs.filter(j=>j.status==='completed').length;
+
+        const ongoing = state.jobs.filter(j => j.status === 'ongoing');
+        document.getElementById('dashOngoingJobs').innerHTML = ongoing.map(job => createJobCard(job)).join('') || '<p class="text-muted text-center py-4">No ongoing jobs.</p>';
+
+        const recentNotifs = state.notifications.slice(0, 2);
+        document.getElementById('dashRecentNotifs').innerHTML = `
+             <div class="section-header"><h2>Recent Alerts</h2><a href="#" onclick="navigate('notifications');return false;">View All</a></div>
+             ${recentNotifs.map(n => `
+                <div class="notif-item ${n.read?'':'unread'}">
+                    <div class="notif-icon"><i class="fas ${n.type==='job'?'fa-briefcase':n.type==='money'?'fa-rupee-sign':'fa-info-circle'}"></i></div>
+                    <div class="notif-content">
+                        <h4>${n.title}</h4>
+                        <p>${n.msg}</p>
+                        <div class="notif-time">${n.time}</div>
+                    </div>
+                </div>
+             `).join('')}
+        `;
+    }
+
+    function createJobCard(job) {
+        return `
+            <div class="job-card" style="border-left:4px solid ${job.status==='new'?'var(--warning)':job.status==='ongoing'?'var(--primary)':'var(--success)'}">
+                <div class="job-info">
+                    <h3>${job.title}</h3>
+                    <div class="text-muted text-sm" style="margin:4px 0">
+                        <i class="fas fa-user"></i> ${job.customer}
+                        ${job.phone ? ` &nbsp;|&nbsp; <i class="fas fa-phone"></i> ${job.phone}` : ''}
+                    </div>
+                    <div class="text-muted text-sm"><i class="fas fa-map-marker-alt"></i> ${job.location}</div>
+                    <div class="job-meta" style="margin-top:8px">
+                        ${job.date ? `<span><i class="far fa-calendar"></i> ${job.date}</span>` : ''}
+                        ${job.time ? `<span><i class="far fa-clock"></i> ${job.time}</span>` : ''}
+                        <span class="badge ${job.status==='completed'?'badge-success':job.status==='ongoing'?'badge-info':'badge-warning'}">${job.status.toUpperCase()}</span>
+                    </div>
+                </div>
+                <div class="job-actions">
+                    ${job.status === 'new'     ? `<button class="btn-primary" onclick="acceptJob(${job.id})" style="background:var(--success)">✓ Accept Job</button>` : ''}
+                    ${job.status === 'ongoing' ? `<button class="btn-primary" onclick="completeJob(${job.id})">Mark Complete</button>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderJobs(filter) {
+        const tabs = document.getElementById('jobTabs');
+        tabs.innerHTML = `
+            <div class="tab ${filter==='all'?'active':''}" onclick="renderJobs('all')">All</div>
+            <div class="tab ${filter==='new'?'active':''}" onclick="renderJobs('new')">New</div>
+            <div class="tab ${filter==='ongoing'?'active':''}" onclick="renderJobs('ongoing')">Ongoing</div>
+            <div class="tab ${filter==='completed'?'active':''}" onclick="renderJobs('completed')">Completed</div>
+        `;
+
+        let filtered = state.jobs;
+        if(filter !== 'all') filtered = state.jobs.filter(j => j.status === filter);
+
+        document.getElementById('jobsList').innerHTML = filtered.map(job => createJobCard(job)).join('') || '<div class="text-center py-10 text-muted">No jobs found in this category.</div>';
+    }
+
+    function renderEarnings() {
+        document.getElementById('earningStats').innerHTML = `
+             <div class="stat-card"><div class="stat-info"><p>Total Earnings</p><h3>₹ ${(state.user.balance + state.user.withdrawn).toLocaleString()}</h3></div></div>
+             <div class="stat-card"><div class="stat-info"><p>This Month</p><h3>₹ ${(state.user.balance + state.user.pending).toLocaleString()}</h3></div></div>
+             <div class="stat-card"><div class="stat-info"><p>Avg/Job</p><h3>₹ 850</h3></div></div>
+        `;
+        document.getElementById('donutTotal').innerText = `₹ ${(state.user.balance + state.user.pending).toLocaleString()}`;
+        document.getElementById('earningsWalletBal').innerText = `₹ ${state.user.balance.toLocaleString()}`;
+
+        const ctx = document.getElementById('earningsChart').getContext('2d');
+        if(window.myChart) window.myChart.destroy();
+        window.myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Earnings',
+                    data: [1200, 1900, 300, 500, 2000, 3000, 4500],
+                    borderColor: '#1a3a6e',
+                    backgroundColor: 'rgba(26, 58, 110, 0.05)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: '#f1f5f9' }, ticks: { color: '#64748b' } },
+                    x: { grid: { display: false }, ticks: { color: '#64748b' } }
+                }
+            }
+        });
+
+        document.getElementById('earningsRecentTxns').innerHTML = `
+            <table class="w-full">
+                <thead><tr><th>Date</th><th>Desc</th><th>Amount</th></tr></thead>
+                <tbody>
+                    ${state.transactions.slice(0,5).map(t => `
+                        <tr>
+                            <td>${t.date}</td>
+                            <td>${t.desc}</td>
+                            <td style="color:var(--success)">+₹${t.amount}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function renderWallet() {
+        document.getElementById('walletAvailBal').innerText = `₹ ${state.user.balance.toLocaleString()}`;
+        document.getElementById('walletMonthE').innerText = `₹ ${(state.user.balance + state.user.pending).toLocaleString()}`;
+        document.getElementById('walletPendingE').innerText = `₹ ${state.user.pending.toLocaleString()}`;
+
+        document.getElementById('txnBody').innerHTML = state.transactions.map(t => `
+            <tr>
+                <td>${t.date}</td>
+                <td class="text-muted">#${t.id}</td>
+                <td>${t.desc}</td>
+                <td style="color:var(--success)">+₹${t.amount}</td>
+                <td><span class="badge badge-success">${t.status}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    function renderNotifications() {
+        const list = document.getElementById('notifList');
+        list.innerHTML = state.notifications.map(n => `
+            <div class="notif-item ${n.read?'':'unread'}">
+                <div class="notif-icon"><i class="fas ${n.type==='job'?'fa-briefcase':n.type==='money'?'fa-rupee-sign':'fa-info-circle'}"></i></div>
+                <div class="notif-content">
+                    <h4>${n.title}</h4>
+                    <p>${n.msg}</p>
+                    <div class="notif-time">${n.time}</div>
+                </div>
+                ${!n.read ? '<button onclick="markRead('+n.id+')" style="background:none;border:none;color:var(--brand-accent);font-size:12px;cursor:pointer;font-weight:600;">Mark Read</button>' : ''}
+            </div>
+        `).join('');
+
+        const unread = state.notifications.some(n => !n.read);
+        document.getElementById('notifBadge').style.display = unread ? 'block' : 'none';
+    }
+
+    function renderSupport() {
+        document.getElementById('ticketsList').innerHTML = `
+            <div class="p-3 bg-gray-50 rounded mb-2 flex justify-between items-center border border-gray-100">
+                <div><strong>Ticket #402</strong><br><small class="text-muted">Payment Issue</small></div>
+                <span class="badge badge-warning">Open</span>
+            </div>
+            <div class="p-3 bg-gray-50 rounded flex justify-between items-center border border-gray-100">
+                <div><strong>Ticket #399</strong><br><small class="text-muted">App Bug</small></div>
+                <span class="badge badge-success">Resolved</span>
+            </div>
+        `;
+    }
+
+    // --- Actions ---
+
+    async function acceptJob(id) {
+        try {
+            const res  = await fetch(API+'?module=jobs', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({action:'accept', job_id:id})
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                showPanelToast('✅ Job accepted! Customer will be notified.');
+                await loadJobs();
+                renderJobs('ongoing');
+                renderDashboard();
+            } else {
+                alert(data.message || 'Could not accept job.');
+            }
+        } catch(e) { alert('Network error — please try again.'); }
+    }
+
+    async function completeJob(id) {
+        try {
+            const res  = await fetch(API+'?module=jobs', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({action:'complete', job_id:id})
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                showPanelToast('🎉 Job marked complete!');
+                await loadJobs();
+                renderJobs('completed');
+                renderDashboard();
+            } else {
+                alert(data.message || 'Could not complete job.');
+            }
+        } catch(e) { alert('Network error — please try again.'); }
+    }
+
+    async function markRead(id) {
+        try {
+            await fetch(API+'?module=notifications', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({action:'mark_read', id})
+            });
+        } catch(e) {}
+        const notif = state.notifications.find(n => n.id === id);
+        if (notif) { notif.read = true; renderNotifications(); }
+    }
+
+    async function markAllRead() {
+        try {
+            await fetch(API+'?module=notifications', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({action:'mark_all_read'})
+            });
+        } catch(e) {}
+        state.notifications.forEach(n => n.read = true);
+        renderNotifications();
+    }
+
+    function showPanelToast(msg) {
+        let t = document.getElementById('panelToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'panelToast';
+            t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0d1b3e;color:#fff;padding:10px 22px;border-radius:50px;font-size:.85rem;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:opacity .3s';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.style.opacity = '1';
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+    }
+
+    // --- Settings Logic ---
+    function showSettingsTab(tabId, el) {
+        document.querySelectorAll('.settings-section').forEach(s => s.classList.add('hidden'));
+        document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    function toggleSwitch(el) {
+        el.classList.toggle('active');
+    }
+
+    function saveProfile() {
+        state.user.name = document.getElementById('fullName').value || state.user.name;
+        state.user.phone = document.getElementById('mobile').value || state.user.phone;
+        document.getElementById('topbarName').innerText = state.user.name;
+        alert('Profile Saved Successfully!');
+    }
+
+    function handleProfileImageChange(e) {
+        const file = e.target.files[0];
+        if(file) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                state.user.avatar = evt.target.result;
+                updateAvatars();
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function updateAvatars() {
+        document.getElementById('topbarAvatar').src = state.user.avatar;
+        document.getElementById('profileImg').src = state.user.avatar;
+    }
+
+    function saveBank() { alert('Bank Details Updated Securely.'); }
+    function saveAppSettings() { alert('Preferences Saved.'); }
+
+    function changePassword() {
+        const old = document.getElementById('oldPassword').value;
+        const newP = document.getElementById('newPassword').value;
+        const conf = document.getElementById('confirmPassword').value;
+
+        if(!old || !newP || !conf) { alert('Please fill all fields'); return; }
+        if(newP !== conf) { alert('Passwords do not match'); return; }
+        if(newP.length < 6) { alert('Password must be at least 6 characters'); return; }
+
+        alert('Password Changed Successfully!');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+    }
+
+    // --- Modals ---
+    function openWithdraw() {
+        document.getElementById('modalBal').innerText = state.user.balance;
+        document.getElementById('withdrawModal').classList.add('open');
+    }
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+    function submitWithdraw() {
+        const amt = parseInt(document.getElementById('withdrawAmt').value);
+        if(!amt || amt <= 0) { alert('Invalid Amount'); return; }
+        if(amt > state.user.balance) { alert('Insufficient Balance'); return; }
+
+        state.user.balance -= amt;
+        state.user.withdrawn += amt;
+        state.transactions.unshift({
+            id: "WTH"+Math.floor(Math.random()*10000),
+            date: new Date().toISOString().split('T')[0],
+            desc: "Withdrawal to Bank",
+            amount: -amt,
+            status: "Processing"
+        });
+
+        alert(`Withdrawal Request for ₹${amt} Submitted.`);
+        closeModal('withdrawModal');
+        renderWallet();
+        renderDashboard();
+    }
+
+    function openTicket() {
+        document.getElementById('ticketModal').classList.add('open');
+    }
+    function submitTicket() {
+        const sub = document.getElementById('ticketSubject').value;
+        if(!sub) { alert('Please enter a subject'); return; }
+        alert('Ticket Raised Successfully! We will contact you soon.');
+        closeModal('ticketModal');
+        document.getElementById('ticketSubject').value = '';
+        document.getElementById('ticketDesc').value = '';
+    }
+
+    function startChat() { alert('Chat feature coming soon!'); }
+    function callSupport() { alert('Calling Support: +91-1800-KWIKER'); }
+    function viewAllTopics() { navigate('support'); }
+
+    // --- API base ---
+    const API = '../backend/api/api.php';
+
+    // --- Setup PHP session then load real data ---
+    async function bootApp() {
+        if (window._autoLoginParams?.phone) {
+            try {
+                await fetch(API+'?module=setup_session', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({phone: window._autoLoginParams.phone})
+                });
+            } catch(e) {}
+        }
+        initNav();
+        await loadLiveData();
+        navigate('dashboard');
+    }
+
+    async function loadLiveData() {
+        await Promise.all([loadJobs(), loadNotifications()]);
+    }
+
+    async function loadJobs() {
+        try {
+            const [rNew, rOng, rDone] = await Promise.all([
+                fetch(API+'?module=jobs&status=new'),
+                fetch(API+'?module=jobs&status=ongoing'),
+                fetch(API+'?module=jobs&status=completed')
+            ]);
+            const [dNew, dOng, dDone] = await Promise.all([rNew.json(), rOng.json(), rDone.json()]);
+            const mapJob = (j, status) => ({
+                id:       j.id,
+                title:    j.title,
+                customer: j.customer_name || 'Customer',
+                phone:    j.customer_phone || '',
+                location: j.address || 'Address not provided',
+                time:     j.start_time || j.job_date || '',
+                date:     j.job_date || '',
+                status:   status,
+                price:    parseFloat(j.amount) || 0
+            });
+            state.jobs = [
+                ...(dNew.jobs  || []).map(j => mapJob(j, 'new')),
+                ...(dOng.jobs  || []).map(j => mapJob(j, 'ongoing')),
+                ...(dDone.jobs || []).map(j => mapJob(j, 'completed'))
+            ];
+        } catch(e) { /* keep demo data on error */ }
+    }
+
+    async function loadNotifications() {
+        try {
+            const res  = await fetch(API+'?module=notifications');
+            const data = await res.json();
+            if (data.status === 'success' && data.notifications) {
+                state.notifications = data.notifications.map(n => ({
+                    id:    n.id,
+                    title: n.title,
+                    msg:   n.message,
+                    time:  n.created_at,
+                    read:  !!parseInt(n.is_read),
+                    type:  n.type
+                }));
+                const badge = document.getElementById('notifBadge');
+                if (badge) badge.style.display = data.unread_count > 0 ? 'block' : 'none';
+            }
+        } catch(e) {}
+    }
+
+    // --- Boot the app directly (login is handled by main site) ---
+    bootApp();
+
+    function logout() {
+        if(confirm('Are you sure you want to logout?')) {
+            window.location.replace('/mono-kwikar/frontend/index.html');
+        }
+    }
+
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.classList.remove('open');
+        }
+    }
+</script>
+</body>
+</html>

@@ -58,17 +58,120 @@ function db(): PDO {
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
   $pdo->exec("CREATE TABLE IF NOT EXISTS kwikar_bookings (
-    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_phone  VARCHAR(15)  NOT NULL,
-    service     VARCHAR(80)  NOT NULL,
-    issue       VARCHAR(200) NOT NULL,
-    other_issue TEXT         NULL,
-    slot_time   VARCHAR(50)  NULL,
-    slot_date   VARCHAR(50)  NULL,
-    status      ENUM('pending','confirmed','completed','cancelled') DEFAULT 'pending',
-    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    service           VARCHAR(80)  NOT NULL,
+    issue             VARCHAR(200) NOT NULL,
+    other_issue       TEXT         NULL,
+    slot_time         VARCHAR(50)  NULL,
+    slot_date         VARCHAR(50)  NULL,
+    user_name         VARCHAR(100) NULL,
+    user_phone        VARCHAR(15)  NOT NULL,
+    profession        VARCHAR(100) NULL,
+    full_address      TEXT         NULL,
+    pincode           VARCHAR(6)   NULL,
+    pincode_available TINYINT(1)   NOT NULL DEFAULT 0,
+    status            ENUM('pending','confirmed','completed','cancelled') DEFAULT 'pending',
+    technician_id     INT UNSIGNED NULL,
+    created_at        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_user_phone (user_phone),
-    INDEX idx_status (status)
+    INDEX idx_status     (status),
+    INDEX idx_tech       (technician_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  // --- Migrate existing kwikar_bookings: add missing columns if table already existed ---
+  $migrateBookings = [
+    "ALTER TABLE kwikar_bookings ADD COLUMN user_name         VARCHAR(100) NULL         AFTER slot_date",
+    "ALTER TABLE kwikar_bookings ADD COLUMN profession        VARCHAR(100) NULL         AFTER user_phone",
+    "ALTER TABLE kwikar_bookings ADD COLUMN full_address      TEXT         NULL         AFTER profession",
+    "ALTER TABLE kwikar_bookings ADD COLUMN pincode           VARCHAR(6)   NULL         AFTER full_address",
+    "ALTER TABLE kwikar_bookings ADD COLUMN pincode_available TINYINT(1)   NOT NULL DEFAULT 0 AFTER pincode",
+    "ALTER TABLE kwikar_bookings ADD COLUMN technician_id     INT UNSIGNED  NULL AFTER status",
+    "ALTER TABLE kwikar_bookings ADD COLUMN technician_name   VARCHAR(100)  NULL AFTER technician_id",
+    "ALTER TABLE kwikar_bookings ADD COLUMN technician_phone  VARCHAR(15)   NULL AFTER technician_name",
+    "ALTER TABLE kwikar_bookings ADD COLUMN updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+  ];
+  foreach ($migrateBookings as $sql) {
+    try { $pdo->exec($sql); } catch (PDOException $_) { /* column already exists — skip */ }
+  }
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS customers (
+    id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    booking_id   INT UNSIGNED DEFAULT NULL,
+    name         VARCHAR(100) NOT NULL DEFAULT '',
+    phone        VARCHAR(15)  DEFAULT NULL,
+    address      TEXT         DEFAULT NULL,
+    rating       DECIMAL(3,2) DEFAULT 0.00,
+    review_count INT UNSIGNED DEFAULT 0,
+    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_booking (booking_id),
+    INDEX idx_phone   (phone)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS jobs (
+    id            INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+    technician_id INT UNSIGNED  NOT NULL DEFAULT 0,
+    customer_id   INT UNSIGNED  NOT NULL,
+    booking_id    INT UNSIGNED  DEFAULT NULL,
+    title         VARCHAR(200)  NOT NULL DEFAULT '',
+    service_type  VARCHAR(80)   DEFAULT NULL,
+    description   TEXT          DEFAULT NULL,
+    status        ENUM('new','ongoing','completed','cancelled') DEFAULT 'new',
+    job_date      DATE          NOT NULL,
+    start_time    TIME          DEFAULT NULL,
+    amount        DECIMAL(10,2) DEFAULT 0.00,
+    created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_tech     (technician_id),
+    INDEX idx_customer (customer_id),
+    INDEX idx_booking  (booking_id),
+    INDEX idx_status   (status),
+    INDEX idx_date     (job_date)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    technician_id INT UNSIGNED NOT NULL DEFAULT 0,
+    type          ENUM('job','earning','system') DEFAULT 'system',
+    title         VARCHAR(150) NOT NULL DEFAULT '',
+    message       TEXT         DEFAULT NULL,
+    is_read       TINYINT(1)   DEFAULT 0,
+    created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_tech    (technician_id),
+    INDEX idx_read    (is_read),
+    INDEX idx_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS kwikar_area_requests (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    pincode       VARCHAR(6)   NOT NULL,
+    user_name     VARCHAR(100) NULL,
+    user_phone    VARCHAR(15)  NULL,
+    profession    VARCHAR(100) NULL,
+    wants_service TINYINT(1)   NOT NULL DEFAULT 1,
+    created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pincode (pincode)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS technicians (
+    id                INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+    full_name         VARCHAR(100)  NOT NULL,
+    email             VARCHAR(150)  NOT NULL DEFAULT '',
+    mobile            VARCHAR(15)   NOT NULL,
+    password          VARCHAR(255)  DEFAULT NULL,
+    profile_image     VARCHAR(255)  DEFAULT NULL,
+    service_category  VARCHAR(100)  DEFAULT NULL,
+    experience        VARCHAR(50)   DEFAULT NULL,
+    city              VARCHAR(80)   DEFAULT NULL,
+    pincodes          VARCHAR(200)  DEFAULT NULL,
+    rating            DECIMAL(3,2)  DEFAULT 0.00,
+    total_reviews     INT UNSIGNED  DEFAULT 0,
+    is_verified       TINYINT(1)    DEFAULT 0,
+    available_balance DECIMAL(10,2) DEFAULT 0.00,
+    created_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_mobile (mobile),
+    INDEX idx_mobile (mobile)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
   return $pdo;

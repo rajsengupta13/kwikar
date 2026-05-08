@@ -50,6 +50,29 @@ if ($action === 'book') {
         ]);
         $id = $pdo->lastInsertId();
         log_info('Booking created', ['id' => $id, 'service' => $data['service'] ?? '', 'pincode' => $pincode, 'available' => $available]);
+
+        // --- Create customer record + unassigned job + broadcast notification ---
+        try {
+            $custStmt = $pdo->prepare("INSERT INTO customers (booking_id, name, phone, address) VALUES (?,?,?,?)");
+            $custStmt->execute([$id, $data['user_name']??'', $data['user_phone']??'', $data['full_address']??'']);
+            $custId = $pdo->lastInsertId();
+
+            $jobTitle = ucfirst($data['service']??'Service').' – '.($data['issue']??'');
+            $slotDate = !empty($data['slot_date']) ? date('Y-m-d', strtotime($data['slot_date'])) : date('Y-m-d');
+            $jobStmt = $pdo->prepare(
+                "INSERT INTO jobs (technician_id, customer_id, booking_id, title, service_type, description, status, job_date)
+                 VALUES (0, ?, ?, ?, ?, ?, 'new', ?)"
+            );
+            $jobStmt->execute([$custId, $id, $jobTitle, $data['service']??'', $data['other_issue']??$data['issue']??'', $slotDate]);
+
+            $nTitle = 'New Job: '.ucfirst($data['service']??'').' – '.($data['issue']??'');
+            $nMsg   = 'Address: '.($data['full_address']??'N/A').' | Slot: '.($data['slot_date']??'').' '.($data['slot_time']??'');
+            $pdo->prepare("INSERT INTO notifications (technician_id, type, title, message) VALUES (0,'job',?,?)")
+                ->execute([$nTitle, $nMsg]);
+        } catch (PDOException $ne) {
+            log_error('Job/notification creation failed', ['error' => $ne->getMessage()]);
+        }
+
         echo json_encode(['success' => true, 'booking_id' => $id, 'available' => (bool)$available]);
     } catch (PDOException $e) {
         log_error('Booking insert failed', ['error' => $e->getMessage(), 'data' => $data]);
@@ -80,21 +103,15 @@ if ($action === 'save_feedback') {
 
 if ($action === 'save_technician') {
     try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS `kwikar_technician_applications` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `name` VARCHAR(100) NOT NULL,
-            `phone` VARCHAR(15) NOT NULL,
-            `email` VARCHAR(150),
-            `skills` TEXT,
-            `pincodes` VARCHAR(200),
-            `experience` VARCHAR(50),
-            `status` VARCHAR(20) DEFAULT 'pending',
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $stmt = $pdo->prepare("INSERT INTO kwikar_technician_applications
-            (name, phone, email, skills, pincodes, experience)
-            VALUES (?,?,?,?,?,?)");
+        $stmt = $pdo->prepare("INSERT INTO technicians
+            (full_name, mobile, email, service_category, pincodes, experience)
+            VALUES (?,?,?,?,?,?)
+            ON DUPLICATE KEY UPDATE
+              full_name=VALUES(full_name),
+              email=VALUES(email),
+              service_category=VALUES(service_category),
+              pincodes=VALUES(pincodes),
+              experience=VALUES(experience)");
         $stmt->execute([
             $data['name']       ?? '',
             $data['phone']      ?? '',
@@ -103,11 +120,11 @@ if ($action === 'save_technician') {
             $data['pincodes']   ?? '',
             $data['experience'] ?? ''
         ]);
-        $id = $pdo->lastInsertId();
-        log_info('Technician application saved', ['id' => $id, 'phone' => $data['phone'] ?? '']);
+        $id = $pdo->lastInsertId() ?: 0;
+        log_info('Technician saved', ['phone' => $data['phone'] ?? '']);
         echo json_encode(['success' => true, 'id' => $id]);
     } catch (PDOException $e) {
-        log_error('Technician application failed', ['error' => $e->getMessage()]);
+        log_error('Technician save failed', ['error' => $e->getMessage()]);
         echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
     exit;

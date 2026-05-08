@@ -54,18 +54,42 @@ if ($action === 'get_user') {
     exit;
 }
 
-// ── Get bookings by phone ──
+// ── Get bookings by phone (includes technician info when confirmed) ──
 if ($action === 'get_bookings') {
     $phone = trim($_GET['phone'] ?? '');
     if (!$phone) { echo json_encode(['success'=>false,'error'=>'Phone required']); exit; }
     try {
-        $stmt = $pdo->prepare("SELECT id, service, issue, other_issue, slot_time, slot_date, status, created_at FROM kwikar_bookings WHERE user_phone=? ORDER BY created_at DESC");
+        $stmt = $pdo->prepare("
+            SELECT b.id, b.service, b.issue, b.other_issue, b.slot_time, b.slot_date,
+                   b.status, b.created_at,
+                   t.full_name AS technician_name,
+                   t.mobile    AS technician_phone
+            FROM kwikar_bookings b
+            LEFT JOIN technicians t ON b.technician_id = t.id
+            WHERE b.user_phone = ?
+            ORDER BY b.created_at DESC
+        ");
         $stmt->execute([$phone]);
         $bookings = $stmt->fetchAll();
         log_info('Bookings fetched', ['phone' => $phone, 'count' => count($bookings)]);
         echo json_encode(['success'=>true,'bookings'=>$bookings]);
     } catch(PDOException $e) {
         log_error('get_bookings failed', ['error' => $e->getMessage()]);
+        echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Get technician by phone ──
+if ($action === 'get_technician') {
+    $phone = trim($_GET['phone'] ?? '');
+    if (!$phone) { echo json_encode(['success'=>false,'error'=>'Phone required']); exit; }
+    try {
+        $stmt = $pdo->prepare("SELECT full_name as name, mobile as phone, email, service_category as skills, experience, pincodes FROM technicians WHERE mobile=? LIMIT 1");
+        $stmt->execute([$phone]);
+        $t = $stmt->fetch();
+        echo json_encode(['success'=>true,'technician'=>$t ?: null]);
+    } catch(PDOException $e) {
         echo json_encode(['success'=>false,'error'=>$e->getMessage()]);
     }
     exit;
