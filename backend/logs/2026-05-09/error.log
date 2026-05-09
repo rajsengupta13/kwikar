@@ -1,0 +1,12 @@
+[2026-05-09 10:54:50] [INFO] User saved | {"phone":"6205531392","with_pin":true} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=save_user
+[2026-05-09 10:54:50] [INFO] Bookings fetched | {"phone":"6205531392","count":1} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:54:53] [INFO] Bookings fetched | {"phone":"6205531392","count":1} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:55:10] [INFO] Booking created | {"id":"6","service":"fridge","pincode":"812006","available":1} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-09 10:55:11] [INFO] Bookings fetched | {"phone":"6205531392","count":2} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:55:11] [INFO] Bookings fetched | {"phone":"6205531392","count":2} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:55:12] [INFO] Bookings fetched | {"phone":"6205531392","count":2} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:55:18] [INFO] Booking cancelled by user | {"id":6,"phone":"6205531392"} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=cancel_booking
+[2026-05-09 10:55:18] [INFO] Bookings fetched | {"phone":"6205531392","count":2} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 10:55:18] [INFO] Bookings fetched | {"phone":"6205531392","count":2} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=6205531392
+[2026-05-09 11:30:12] [INFO] Technician saved | {"phone":"7894561230","with_pin":true} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-09 13:28:51] [INFO] Technician saved | {"phone":"6205531392","with_pin":true} | IP:::1 POST /mono-kwikar/backend/booking_api.php

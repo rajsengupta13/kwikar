@@ -103,25 +103,53 @@ if ($action === 'save_feedback') {
 
 if ($action === 'save_technician') {
     try {
-        $stmt = $pdo->prepare("INSERT INTO technicians
-            (full_name, mobile, email, service_category, pincodes, experience)
-            VALUES (?,?,?,?,?,?)
-            ON DUPLICATE KEY UPDATE
-              full_name=VALUES(full_name),
-              email=VALUES(email),
-              service_category=VALUES(service_category),
-              pincodes=VALUES(pincodes),
-              experience=VALUES(experience)");
-        $stmt->execute([
-            $data['name']       ?? '',
-            $data['phone']      ?? '',
-            $data['email']      ?? '',
-            $data['skills']     ?? '',
-            $data['pincodes']   ?? '',
-            $data['experience'] ?? ''
-        ]);
+        $pin = trim($data['pin'] ?? '');
+        if ($pin !== '' && !preg_match('/^\d{6}$/', $pin)) {
+            echo json_encode(['success' => false, 'error' => 'PIN must be 6 digits']);
+            exit;
+        }
+        if ($pin !== '') {
+            $hash = password_hash($pin, PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("INSERT INTO technicians
+                (full_name, mobile, email, service_category, pincodes, experience, password)
+                VALUES (?,?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE
+                  full_name=VALUES(full_name),
+                  email=VALUES(email),
+                  service_category=VALUES(service_category),
+                  pincodes=VALUES(pincodes),
+                  experience=VALUES(experience),
+                  password=VALUES(password)");
+            $stmt->execute([
+                $data['name']       ?? '',
+                $data['phone']      ?? '',
+                $data['email']      ?? '',
+                $data['skills']     ?? '',
+                $data['pincodes']   ?? '',
+                $data['experience'] ?? '',
+                $hash
+            ]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO technicians
+                (full_name, mobile, email, service_category, pincodes, experience)
+                VALUES (?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE
+                  full_name=VALUES(full_name),
+                  email=VALUES(email),
+                  service_category=VALUES(service_category),
+                  pincodes=VALUES(pincodes),
+                  experience=VALUES(experience)");
+            $stmt->execute([
+                $data['name']       ?? '',
+                $data['phone']      ?? '',
+                $data['email']      ?? '',
+                $data['skills']     ?? '',
+                $data['pincodes']   ?? '',
+                $data['experience'] ?? ''
+            ]);
+        }
         $id = $pdo->lastInsertId() ?: 0;
-        log_info('Technician saved', ['phone' => $data['phone'] ?? '']);
+        log_info('Technician saved', ['phone' => $data['phone'] ?? '', 'with_pin' => $pin !== '']);
         echo json_encode(['success' => true, 'id' => $id]);
     } catch (PDOException $e) {
         log_error('Technician save failed', ['error' => $e->getMessage()]);

@@ -52,10 +52,14 @@ function db(): PDO {
     address    TEXT         NULL,
     city       VARCHAR(80)  NULL,
     pincode    VARCHAR(6)   NULL,
+    pin        VARCHAR(255) NULL,
     created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_phone (phone)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+  // Migrate kwikar_users: add pin column if table predates it
+  try { $pdo->exec("ALTER TABLE kwikar_users ADD COLUMN pin VARCHAR(255) NULL AFTER pincode"); } catch (PDOException $_) { /* exists */ }
 
   $pdo->exec("CREATE TABLE IF NOT EXISTS kwikar_bookings (
     id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
