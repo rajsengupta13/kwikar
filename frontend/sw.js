@@ -7,9 +7,9 @@
      • Form data      → Background Sync queue
 ═══════════════════════════════════════════════ */
 
-const CACHE_STATIC  = 'kwikar-static-v1.2.8';
-const CACHE_IMAGES  = 'kwikar-images-v1.2.8';
-const CACHE_PAGES   = 'kwikar-pages-v1.2.8';
+const CACHE_STATIC  = 'kwikar-static-v1.3.0';
+const CACHE_IMAGES  = 'kwikar-images-v1.3.0';
+const CACHE_PAGES   = 'kwikar-pages-v1.3.0';
 const ALL_CACHES    = [CACHE_STATIC, CACHE_IMAGES, CACHE_PAGES];
 const OFFLINE_URL   = 'offline.html';
 
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   BASE + 'offline.html',
   BASE + 'manifest.json',
 ];
+const OFFLINE_FULL_URL = BASE + OFFLINE_URL;
 
 /* ── INSTALL ── */
 self.addEventListener('install', event => {
@@ -112,12 +113,15 @@ async function networkFirstWithOffline(request) {
     if (response.ok) {
       const cache = await caches.open(CACHE_PAGES);
       cache.put(request, response.clone());
+      return response;
     }
-    return response;
+    // Server returned an error (4xx / 5xx) — fall through to cache so the
+    // user never sees a raw Apache error page inside the PWA.
+    throw new Error('non-ok response: ' + response.status);
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
-    const offlinePage = await caches.match(OFFLINE_URL);
+    const offlinePage = await caches.match(OFFLINE_FULL_URL);
     return offlinePage || new Response('<h1>You are offline</h1>', { headers: { 'Content-Type': 'text/html' } });
   }
 }

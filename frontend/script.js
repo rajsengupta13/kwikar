@@ -55,6 +55,11 @@
       // Pre-fill in-page pincode checker
       const pinIn=document.getElementById('pinIn');
       if(pinIn)pinIn.value=pin;
+      // Save anonymous pincode visit to DB (tracks area demand before auth)
+      fetch('/mono-kwikar/backend/booking_api.php',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'check_pincode',pincode:pin})
+      }).catch(()=>{});
       // Show auth options
       formState.classList.remove('show');
       successState.classList.add('show');
@@ -426,27 +431,27 @@ async function refreshBookingBadge(){
 
 /* ══════════ LOGIN ══════════ */
 /* ── Login role tracker ── */
-let _loginRole='user'; // 'user' | 'tech'
+let _loginRole='user'; // 'user' | 'tech' | 'abd'
 let _pendingRole=null;
 
 function selectRoleCard(role){
   _pendingRole=role;
-  // card highlight
   document.getElementById('lrcCardUser').classList.toggle('lrc-selected',role==='user');
   document.getElementById('lrcCardTech').classList.toggle('lrc-selected',role==='tech');
-  // enable continue button
+  document.getElementById('lrcCardAbd').classList.toggle('lrc-selected',role==='abd');
   const btn=document.getElementById('lrcContinueBtn');
   btn.classList.add('lrc-active');
-  document.getElementById('lrcBtnText').textContent=role==='user'?'Login as Customer':'Login as Technician';
+  const labels={'user':'Login as Customer','tech':'Login as Technician','abd':'Login as ABD'};
+  document.getElementById('lrcBtnText').textContent=labels[role]||'Continue';
 }
 function confirmRoleSelect(){
   if(_pendingRole)selectRole(_pendingRole);
 }
 
 function _showOnly(id){
-  ['loginRoleView','loginPhoneView','loginPinView','loginRegStep1','loginRegStep2','loginRegStep3','loginTechRegView']
+  ['loginRoleView','loginPhoneView','loginPinView','loginRegStep1','loginRegStep2','loginRegStep3','loginTechRegView','abdRegView']
     .forEach(v=>{const el=document.getElementById(v);if(el)el.style.display=v===id?'':'none';});
-  document.getElementById('loginBox').classList.toggle('scrollable',id==='loginTechRegView'||id==='loginRegStep2');
+  document.getElementById('loginBox').classList.toggle('scrollable',id==='loginTechRegView'||id==='loginRegStep2'||id==='abdRegView');
 }
 
 function openLoginModal(){
@@ -456,6 +461,7 @@ function openLoginModal(){
   // reset card state
   document.getElementById('lrcCardUser').classList.remove('lrc-selected');
   document.getElementById('lrcCardTech').classList.remove('lrc-selected');
+  document.getElementById('lrcCardAbd').classList.remove('lrc-selected');
   const btn=document.getElementById('lrcContinueBtn');
   btn.classList.remove('lrc-active');
   document.getElementById('lrcBtnText').textContent='Continue';
@@ -475,6 +481,10 @@ function selectRole(role){
     document.getElementById('loginPhoneTitle').textContent='Technician Login';
     document.getElementById('loginPhoneSub').textContent='Apna registered mobile number daalo';
     document.getElementById('loginNewLabel').textContent='New Technician?';
+  }else if(role==='abd'){
+    document.getElementById('loginPhoneTitle').textContent='ABD Login';
+    document.getElementById('loginPhoneSub').textContent='Apna registered mobile number daalo';
+    document.getElementById('loginNewLabel').textContent='New ABD?';
   }else{
     document.getElementById('loginPhoneTitle').textContent='Customer Login';
     document.getElementById('loginPhoneSub').textContent='Apna registered mobile number daalo';
@@ -494,11 +504,13 @@ function switchToRoleSelect(){_showOnly('loginRoleView');}
 function switchToRegister(){
   const ph=document.getElementById('loginPhoneOnly').value.trim();
   if(_loginRole==='tech'){
-    // Close login modal, open the full technician signup flow
     closeLoginModal();
     openTechSignup();
-    // Pre-fill phone if the user already typed it
     if(ph){const el=document.getElementById('tsPhone');if(el)el.value=ph;}
+  }else if(_loginRole==='abd'){
+    closeLoginModal();
+    openAbdSignup();
+    if(ph){const el=document.getElementById('abdPhone');if(el)el.value=ph;}
   }else{
     _showOnly('loginRegStep1');
     document.getElementById('regErr1').textContent='';
@@ -531,12 +543,14 @@ async function submitLoginPhone(){
   if(!/^\d{10}$/.test(phone)){err.textContent='Sahi 10-digit number daalo';return;}
   err.textContent='';
   const isTech=_loginRole==='tech';
+  const isAbd=_loginRole==='abd';
   const pinInput=document.getElementById('loginPinInput');
-  pinInput.maxLength=isTech?6:4;
+  pinInput.maxLength=(isTech||isAbd)?6:4;
   pinInput.value='';
-  pinInput.placeholder=isTech?'6-digit Technician PIN':'4-digit PIN';
+  pinInput.placeholder=(isTech||isAbd)?'6-digit PIN':'4-digit PIN';
   document.getElementById('loginPinSub').textContent=isTech
     ? 'Apna 6-digit technician PIN daalo'
+    : isAbd ? 'Apna 6-digit ABD PIN daalo'
     : 'Apna 4-digit PIN daalo';
   document.getElementById('loginPinErr').textContent='';
   _showOnly('loginPinView');
@@ -549,7 +563,8 @@ async function submitLoginPin(){
   const err=document.getElementById('loginPinErr');
   const btn=document.getElementById('loginPinBtn');
   const isTech=_loginRole==='tech';
-  const expectedLen=isTech?6:4;
+  const isAbd=_loginRole==='abd';
+  const expectedLen=(isTech||isAbd)?6:4;
   if(!new RegExp('^\\d{'+expectedLen+'}$').test(pin)){
     err.textContent=`${expectedLen}-digit PIN daalo`;
     return;
@@ -559,7 +574,20 @@ async function submitLoginPin(){
   const orig=btn.textContent;
   btn.textContent='Verifying…';
   try{
-    const action=isTech?'verify_tech_pin':'verify_user_pin';
+    if(isAbd){
+      const res=await fetch('/mono-kwikar/abd/backend/api/api.php?module=login',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({phone,pin})
+      });
+      const data=await res.json();
+      if(!data.success){err.textContent=data.error||'Login nahi ho paya';return;}
+      const abdData={...data.abd,phone,role:'abd'};
+      localStorage.setItem('kwikar_abd',JSON.stringify(abdData));
+      closeLoginModal();
+      redirectToAbdPanel(abdData.full_name||abdData.name||'',phone);
+      return;
+    }
+    const action=isTech?'verify_tech_pin':'login';
     const res=await fetch('/mono-kwikar/backend/user_api.php?action='+action,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({phone,pin})
@@ -633,13 +661,16 @@ async function submitRegStep3(){
   localStorage.setItem('kwikar_user',JSON.stringify(userData));
   localStorage.setItem('kwikar_pin_done','1');
   try{
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=save_user',{
+    const res=await fetch('/mono-kwikar/backend/user_api.php?action=register',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...userData,pin})
     });
     const json=await res.json();
     if(!json.success){err.textContent=json.error||'Save nahi ho paya';return;}
+    // Store user_id so booking API can link bookings to this account
+    if(json.user?.id) userData.user_id=json.user.id;
   }catch(e){err.textContent='Server error — dobara try karo';return;}
+  localStorage.setItem('kwikar_user',JSON.stringify(userData));
   applyLogin(name,'user');closeLoginModal();refreshBookingBadge();
 }
 
@@ -673,6 +704,138 @@ async function submitTechReg(){
     redirectToTechPanel(name, techData.phone||norm, techData.email||'', techData.skills||'');
   },1400);
 }
+function redirectToAbdPanel(name, phone){
+  const base='/mono-kwikar/abd/frontend/index.html';
+  const p=new URLSearchParams({autologin:'1',name:name||'',phone:phone||''});
+  setTimeout(()=>{ window.location.href=base+'?'+p.toString(); },400);
+}
+
+/* ══ ABD Signup multi-step ══ */
+let _abdPins=[];
+let _abdServices=[];
+let _abdExp='';
+
+function openAbdSignup(){
+  _abdPins=[];_abdExp='';
+  document.getElementById('abdPinTags').innerHTML='';
+  document.querySelectorAll('#abdSignupOverlay .ts-pill').forEach(p=>p.classList.remove('selected'));
+  ['abdName','abdPhone','abdEmail','abdArea','abdPinInput','abdLoginPin','abdLoginPinConfirm']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['abdErr1','abdErr2','abdErr3','abdErr4']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
+  _abdShowStep(1);
+  document.getElementById('abdSignupOverlay').classList.add('show');
+  setTimeout(()=>document.getElementById('abdName').focus(),200);
+}
+
+function closeAbdSignup(){
+  document.getElementById('abdSignupOverlay').classList.remove('show');
+}
+
+function _abdShowStep(n){
+  document.querySelectorAll('#abdSignupOverlay .abd-step').forEach((el,i)=>{
+    el.classList.toggle('active', i===n-1);
+  });
+  for(let i=1;i<=4;i++){
+    const d=document.getElementById('abdp'+i);
+    if(!d) continue;
+    d.classList.remove('active','done');
+    if(i<n) d.classList.add('done');
+    else if(i===n) d.classList.add('active');
+  }
+}
+
+function abdNext(step){
+  if(step===1){
+    const name=document.getElementById('abdName').value.trim();
+    const phone=document.getElementById('abdPhone').value.trim();
+    const email=document.getElementById('abdEmail').value.trim();
+    const area=document.getElementById('abdArea').value.trim();
+    const err=document.getElementById('abdErr1');
+    if(!name){err.textContent='Naam daalna zaroori hai';return;}
+    if(!/^\d{10}$/.test(phone)){err.textContent='Sahi 10-digit number daalo';return;}
+    if(!email||!email.includes('@')){err.textContent='Valid email daalo';return;}
+    if(!area){err.textContent='Area/city daalna zaroori hai';return;}
+    err.textContent='';
+    _abdShowStep(2);
+    setTimeout(()=>document.getElementById('abdPinInput').focus(),100);
+  } else if(step===2){
+    const err=document.getElementById('abdErr2');
+    if(!_abdPins.length){err.textContent='Kam se kam ek pincode add karo';return;}
+    err.textContent='';
+    // Init experience pill click handlers
+    document.querySelectorAll('#abdExpPills .ts-pill').forEach(p=>{
+      p.onclick=()=>{
+        document.querySelectorAll('#abdExpPills .ts-pill').forEach(x=>x.classList.remove('selected'));
+        p.classList.add('selected');
+        _abdExp=p.dataset.val;
+      };
+    });
+    _abdShowStep(3);
+  } else if(step===3){
+    const err=document.getElementById('abdErr3');
+    if(!_abdExp){err.textContent='Experience select karo';return;}
+    err.textContent='';
+    _abdShowStep(4);
+    setTimeout(()=>document.getElementById('abdLoginPin').focus(),100);
+  }
+}
+
+function abdBack(step){ _abdShowStep(step-1); }
+
+function addAbdPin(){
+  const input=document.getElementById('abdPinInput');
+  const pin=input.value.trim();
+  const err=document.getElementById('abdErr2');
+  if(!/^\d{6}$/.test(pin)){err.textContent='Sahi 6-digit pincode daalo';return;}
+  if(_abdPins.includes(pin)){err.textContent='Yeh pincode pehle se add hai';return;}
+  if(_abdPins.length>=10){err.textContent='Maximum 10 pincodes allowed hain';return;}
+  _abdPins.push(pin);
+  err.textContent='';
+  input.value='';
+  const tag=document.createElement('div');
+  tag.className='ts-pin-tag';
+  tag.id='abdPinTag_'+pin;
+  tag.innerHTML=pin+' <button type="button" onclick="removeAbdPin(\''+pin+'\')">✕</button>';
+  document.getElementById('abdPinTags').appendChild(tag);
+  input.focus();
+}
+
+function removeAbdPin(pin){
+  _abdPins=_abdPins.filter(p=>p!==pin);
+  const tag=document.getElementById('abdPinTag_'+pin);
+  if(tag)tag.remove();
+}
+
+async function submitAbdSignup(){
+  const pin=document.getElementById('abdLoginPin').value.trim();
+  const pinConfirm=document.getElementById('abdLoginPinConfirm').value.trim();
+  const err=document.getElementById('abdErr4');
+  if(!/^\d{6}$/.test(pin)){err.textContent='6-digit PIN daalo';return;}
+  if(pin!==pinConfirm){err.textContent='Dono PIN match nahi kar rahe';return;}
+  err.textContent='';
+  const btn=document.getElementById('abdSubmitBtn');
+  btn.disabled=true; btn.textContent='Submitting…';
+  const name=document.getElementById('abdName').value.trim();
+  const phone=document.getElementById('abdPhone').value.trim().replace(/\D/g,'').slice(-10);
+  const email=document.getElementById('abdEmail').value.trim();
+  const area=document.getElementById('abdArea').value.trim();
+  try{
+    const res=await fetch('/mono-kwikar/abd/backend/api/api.php?module=register',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,phone,email,area,pincodes:_abdPins,experience:_abdExp,pin})
+    });
+    const data=await res.json();
+    if(!data.success){err.textContent=data.error||'Register nahi ho paya';btn.disabled=false;btn.textContent='Submit 🚀';return;}
+    localStorage.setItem('kwikar_abd',JSON.stringify({name,phone,email,area,role:'abd',id:data.abd_id}));
+    _abdShowStep(5);
+    setTimeout(()=>{ closeAbdSignup(); redirectToAbdPanel(name,phone); },2200);
+  }catch(e){
+    err.textContent='Server error — dobara try karo';
+    btn.disabled=false; btn.textContent='Submit 🚀';
+  }
+}
+
 function redirectToTechPanel(name, phone, email, role){
   const base='/mono-kwikar/technician/frontend/index.html';
   const p=new URLSearchParams({
@@ -711,6 +874,9 @@ function applyLogin(name,role){
   // Show technician panel quick-link in nav when logged in as tech
   const techPanelBtn=document.getElementById('techPanelNavBtn');
   if(techPanelBtn)techPanelBtn.style.display=isTech?'inline-flex':'none';
+  // Show ABD panel quick-link in nav when logged in as abd
+  const abdPanelBtn=document.getElementById('abdPanelNavBtn');
+  if(abdPanelBtn)abdPanelBtn.style.display=(role==='abd')?'inline-flex':'none';
   startGreetCycle(firstName,isTech);
 }
 function startGreetCycle(name,isTech){
@@ -964,6 +1130,9 @@ async function submitTechSignup(){
     experience:tsSelectedExp,
     role:'tech'
   };
+  // Attach ABD referral ID if technician came via referral link
+  const abdRef = sessionStorage.getItem('kwikar_abd_ref');
+  if (abdRef) payload.abd_id = abdRef;
   try{
     await fetch('/mono-kwikar/backend/booking_api.php',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -1249,27 +1418,183 @@ document.getElementById('bkSubmit').addEventListener('click',()=>{
   submitBooking();
 });
 
-function submitBooking(){
-  const app=APPLIANCES[bookingState.appliance];
-  const issueLabel=bookingState.issue==='other-issue'
-    ?bookingState.issueText
-    :app.issues.find(i=>i.id===bookingState.issue)?.label||bookingState.issue;
+async function submitBooking(){
+  const app       = APPLIANCES[bookingState.appliance];
+  const issueLabel= bookingState.issue==='other-issue'
+    ? bookingState.issueText
+    : app.issues.find(i=>i.id===bookingState.issue)?.label||bookingState.issue;
+
   document.getElementById('bkSummary').innerHTML=
     `<div class="bk-sum-row"><span>📱 Mobile</span><strong>${bookingState.phone}</strong></div>`+
     `<div class="bk-sum-row"><span>🔧 Appliance</span><strong>${app.name}</strong></div>`+
     `<div class="bk-sum-row"><span>⚠️ Issue</span><strong>${issueLabel}</strong></div>`;
-  queueFormData('kwikar-booking-queue',{
-    phone:bookingState.phone,
-    appliance:bookingState.appliance,
-    applianceName:app.name,
-    issue:bookingState.issue,
-    issueLabel:issueLabel,
-    issueText:bookingState.issueText,
-    pincode:document.getElementById('pinIn')?.value||'',
-    ts:Date.now()
-  });
-  showBookingStep('success');
+
+  const userRaw   = localStorage.getItem('kwikar_user');
+  const user      = userRaw ? JSON.parse(userRaw) : null;
+  const pincode   = document.getElementById('pinIn')?.value?.trim() || localStorage.getItem('kwikar_welcome_pin') || '';
+
+  // ── If logged-in user has no profession saved yet → ask now ──────
+  if(user?.user_id && !user.profession){
+    const prof = await askProfession();
+    if(prof){
+      user.profession = prof;
+      localStorage.setItem('kwikar_user', JSON.stringify(user));
+      // Save profession to DB (fire-and-forget)
+      fetch('/mono-kwikar/backend/user_api.php?action=save_profession',{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user_id: user.user_id, profession: prof})
+      }).catch(()=>{});
+    }
+  }
+
+  const payload = {
+    action        : 'book',
+    service       : app.name,
+    issue         : issueLabel,
+    other_issue   : bookingState.issueText || '',
+    user_name     : user?.name  || '',
+    user_phone    : bookingState.phone,
+    user_id       : user?.user_id || null,
+    profession    : user?.profession || bookingState.profession || '',
+    full_address  : user?.address   || '',
+    pincode       : pincode,
+    slot_date     : '',
+    slot_time     : '',
+  };
+
+  try{
+    const res  = await fetch('/mono-kwikar/backend/booking_api.php',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+
+    if(json.success){
+      // ── New guest user — server says they need to set a PIN ────────
+      if(json.needs_pin && json.user_id){
+        showBookingStep('success');
+        // Short delay so success screen is visible first, then show PIN prompt
+        setTimeout(()=> showPinSetupPrompt(bookingState.phone, json.user_id), 800);
+      } else {
+        showBookingStep('success');
+      }
+    } else {
+      // Server-side error — still show success to user (offline-tolerant)
+      showBookingStep('success');
+    }
+  }catch(e){
+    // Network offline — queue for background sync, show success
+    queueFormData('kwikar-booking-queue',{
+      phone:bookingState.phone, appliance:bookingState.appliance,
+      applianceName:app.name, issue:bookingState.issue,
+      issueLabel, issueText:bookingState.issueText,
+      pincode, ts:Date.now()
+    });
+    showBookingStep('success');
+  }
 }
+
+/* ── Profession popup (shown once per logged-in user) ─────────────── */
+function askProfession(){
+  return new Promise(resolve=>{
+    const overlay = document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+    overlay.innerHTML=`
+      <div style="background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:28px 24px 36px;font-family:inherit">
+        <div style="width:36px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 20px"></div>
+        <h3 style="margin:0 0 6px;font-size:1.1rem;color:#0d1b3e">Aap kya kaam karte hain? 🔧</h3>
+        <p style="margin:0 0 18px;font-size:.85rem;color:#64748b">Ek baar batao — hum bar-bar nahi poochenge</p>
+        <input id="_profInput" type="text" placeholder="e.g. AC Technician, Electrician, Driver..."
+          style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.95rem;box-sizing:border-box;outline:none">
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button id="_profSkip" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-size:.9rem;color:#64748b">Skip</button>
+          <button id="_profSave" style="flex:2;padding:12px;background:#0d1b3e;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:600">Save karo</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#_profInput');
+    setTimeout(()=>input.focus(),100);
+    overlay.querySelector('#_profSkip').onclick=()=>{ document.body.removeChild(overlay); resolve(null); };
+    overlay.querySelector('#_profSave').onclick=()=>{
+      const val=input.value.trim();
+      document.body.removeChild(overlay);
+      resolve(val||null);
+    };
+  });
+}
+
+/* ── PIN setup popup (shown once for first-time guest users) ──────── */
+function showPinSetupPrompt(phone, userId){
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  overlay.innerHTML=`
+    <div style="background:#fff;width:100%;max-width:480px;border-radius:20px 20px 0 0;padding:28px 24px 36px;font-family:inherit">
+      <div style="width:36px;height:4px;background:#e2e8f0;border-radius:2px;margin:0 auto 20px"></div>
+      <h3 style="margin:0 0 6px;font-size:1.1rem;color:#0d1b3e">🔐 Apna tracking PIN banao</h3>
+      <p style="margin:0 0 18px;font-size:.85rem;color:#64748b">4-digit PIN se apni booking track kar paoge — yaad rakhna zaroori hai</p>
+      <input id="_pinA" type="password" inputmode="numeric" maxlength="4" placeholder="4-digit PIN"
+        style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:1.1rem;letter-spacing:.3rem;box-sizing:border-box;outline:none;margin-bottom:10px">
+      <input id="_pinB" type="password" inputmode="numeric" maxlength="4" placeholder="Dobara daalo"
+        style="width:100%;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:1.1rem;letter-spacing:.3rem;box-sizing:border-box;outline:none">
+      <p id="_pinErr" style="color:#ef4444;font-size:.8rem;margin:6px 0 0;min-height:16px"></p>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button id="_pinSkip" style="flex:1;padding:12px;border:1.5px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-size:.9rem;color:#64748b">Baad mein</button>
+        <button id="_pinSet" style="flex:2;padding:12px;background:#0d1b3e;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:.95rem;font-weight:600">PIN Set karo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>overlay.querySelector('#_pinA').focus(),100);
+  overlay.querySelector('#_pinSkip').onclick=()=>document.body.removeChild(overlay);
+  overlay.querySelector('#_pinSet').onclick=async()=>{
+    const a=overlay.querySelector('#_pinA').value.trim();
+    const b=overlay.querySelector('#_pinB').value.trim();
+    const errEl=overlay.querySelector('#_pinErr');
+    if(!/^\d{4}$/.test(a)){errEl.textContent='4-digit PIN daalo';return;}
+    if(a!==b){errEl.textContent='Dono PIN match nahi kar rahe';return;}
+    errEl.textContent='';
+    try{
+      const res=await fetch('/mono-kwikar/backend/user_api.php?action=set_pin',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({phone,pin:a})
+      });
+      const json=await res.json();
+      if(json.success){
+        document.body.removeChild(overlay);
+        // Update localStorage so user appears logged in
+        const existing=JSON.parse(localStorage.getItem('kwikar_user')||'{}');
+        existing.user_id=userId; existing.phone=phone; existing.role='user';
+        localStorage.setItem('kwikar_user',JSON.stringify(existing));
+        showUserToast('✅ PIN set ho gaya! Ab aap login kar sakte hain.');
+      } else {
+        errEl.textContent=json.error||'PIN save nahi ho paya';
+      }
+    }catch(e){ errEl.textContent='Server error — baad mein try karo'; }
+  };
+}
+
+// ── ABD Referral Link Handler ─────────────────────────────────────────────
+// Triggered when technician opens: /frontend/index.html?abd_ref=<id>&join=tech
+(function(){
+  const p = new URLSearchParams(window.location.search);
+  const abdRef = p.get('abd_ref');
+  const join   = p.get('join');
+  if (!abdRef || join !== 'tech') return;
+
+  // Store the ABD ID so submitTechSignup() can include it
+  sessionStorage.setItem('kwikar_abd_ref', abdRef);
+
+  // Auto-open technician signup form once the page is interactive
+  function tryOpen() {
+    if (typeof openTechSignup === 'function') {
+      openTechSignup();
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(tryOpen, 600));
+  } else {
+    setTimeout(tryOpen, 600);
+  }
+})();
 
 document.getElementById('bkDoneBtn').addEventListener('click',closeBookingModal);
 
@@ -1327,7 +1652,7 @@ let swReg=null;
 if('serviceWorker' in navigator){
   window.addEventListener('load',async()=>{
     try{
-      swReg=await navigator.serviceWorker.register('sw.js',{scope:'/mono-kwikar/frontend/'});
+      swReg=await navigator.serviceWorker.register('sw.js');
       console.log('[PWA] Service Worker registered ✓', swReg.scope);
 
       // Check for updates

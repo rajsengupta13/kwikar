@@ -2,8 +2,8 @@
   "name": "Kwikar — Home Appliance Repair Bhagalpur",
   "short_name": "Kwikar",
   "description": "Book verified home appliance repair technicians at your doorstep. Launching in Bhagalpur on 26 May 2026.",
-  "start_url": "/mono-kwikar/frontend/",
-  "scope": "/mono-kwikar/frontend/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#1849d6",
@@ -17,14 +17,14 @@
       "name": "Check My Pincode",
       "short_name": "Pincode",
       "description": "Check if Kwikar is launching in your area",
-      "url": "/#pincode",
+      "url": "./index.html#pincode",
       "icons": [{ "src": "images/icons/icon-96.png", "sizes": "96x96" }]
     },
     {
       "name": "Join as Technician",
       "short_name": "Join Tech",
       "description": "Register as a Kwikar technician",
-      "url": "/#technician",
+      "url": "./index.html#technician",
       "icons": [{ "src": "images/icons/icon-96.png", "sizes": "96x96" }]
     }
   ],

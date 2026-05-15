@@ -1,5 +1,5 @@
 <?php
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -8,242 +8,927 @@ header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
+set_exception_handler(function (Throwable $e) {
+    if (!headers_sent()) http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Server error: ' . $e->getMessage()]);
+    exit;
+});
+
 $module = $_GET['module'] ?? '';
 $method = $_SERVER['REQUEST_METHOD'];
-$d = $method === 'POST' ? (json_decode(file_get_contents("php://input"), true) ?? []) : [];
+$d      = $method === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?? []) : [];
 
-// --- Public: setup session by phone (called by panel on auto-login) ---
+// ── Public: setup session by phone ───────────────────────────────────────────
 if ($module === 'setup_session') {
     $phone = trim($d['phone'] ?? '');
-    if (!$phone) { echo json_encode(["status"=>"error","message"=>"Phone required"]); exit; }
+    if (!$phone) { echo json_encode(['status' => 'error', 'message' => 'Phone required']); exit; }
+
     $db = (new Database())->getConnection();
-    $st = $db->prepare("SELECT id, full_name, email, service_category FROM technicians WHERE mobile=? LIMIT 1");
+    $st = $db->prepare("
+        SELECT u.id AS user_id, u.name AS full_name, u.email, u.phone AS mobile,
+               t.id AS technician_id, t.availability_status, t.kyc_status,
+               up.profile_image,
+               GROUP_CONCAT(s.name ORDER BY s.name SEPARATOR ', ') AS service_category
+        FROM   users u
+        JOIN   technicians t    ON u.id = t.user_id
+        LEFT JOIN user_profiles up ON u.id = up.user_id
+        LEFT JOIN technician_services ts ON t.id = ts.technician_id
+        LEFT JOIN services s            ON ts.service_id = s.id
+        WHERE  u.phone = ? AND u.role = 'technician'
+        GROUP  BY u.id, t.id, up.profile_image
+        LIMIT  1
+    ");
     $st->execute([$phone]);
-    $u = $st->fetch(PDO::FETCH_ASSOC);
-    if ($u) {
-        $_SESSION['technician_id'] = $u['id'];
-        echo json_encode(["status"=>"success","tech"=>$u]);
+    $tech = $st->fetch(PDO::FETCH_ASSOC);
+
+    if ($tech) {
+        $_SESSION['technician_id'] = (int) $tech['technician_id'];
+        $_SESSION['tech_user_id']  = (int) $tech['user_id'];
+        echo json_encode(['status' => 'success', 'tech' => $tech]);
     } else {
-        echo json_encode(["status"=>"error","message"=>"Technician not found"]);
+        // Check if number exists under a different role
+        $check = $db->prepare("SELECT role FROM users WHERE phone = ? LIMIT 1");
+        $check->execute([$phone]);
+        $roleRow = $check->fetch(PDO::FETCH_ASSOC);
+        if ($roleRow && $roleRow['role'] !== 'technician') {
+            echo json_encode([
+                'status'        => 'error',
+                'role_conflict' => true,
+                'existing_role' => $roleRow['role'],
+                'message'       => 'This number is registered as a ' . $roleRow['role'] . ', not a technician.',
+            ]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Technician not found']);
+        }
     }
     exit;
 }
 
-if ($module === 'logout') { session_destroy(); echo json_encode(["status"=>"success"]); exit; }
+if ($module === 'logout') {
+    session_destroy();
+    echo json_encode(['status' => 'success']);
+    exit;
+}
 
-// --- Auth guard ---
+// ── Auth guard ───────────────────────────────────────────────────────────────
 if (!isset($_SESSION['technician_id'])) {
     http_response_code(401);
-    echo json_encode(["status"=>"error","message"=>"Unauthorized"]); exit;
+    echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
+    exit;
 }
-$tid = $_SESSION['technician_id'];
-$db  = (new Database())->getConnection();
+
+$tid        = (int) $_SESSION['technician_id'];
+$techUserId = (int) $_SESSION['tech_user_id'];
+$db         = (new Database())->getConnection();
+
+// Ensure earning wallet exists for this technician
+$db->prepare("INSERT IGNORE INTO wallets (user_id, wallet_type, balance) VALUES (?, 'earning', 0.00)")
+   ->execute([$techUserId]);
+
+// Ensure user_settings row exists
+$db->prepare("INSERT IGNORE INTO user_settings (user_id) VALUES (?)")->execute([$techUserId]);
+
+// ── Helper: fetch wallet balance ─────────────────────────────────────────────
+function getWallet(PDO $db, int $userId): array {
+    $st = $db->prepare("SELECT id, balance FROM wallets WHERE user_id = ? AND wallet_type = 'earning' LIMIT 1");
+    $st->execute([$userId]);
+    return $st->fetch(PDO::FETCH_ASSOC) ?: ['id' => null, 'balance' => 0.00];
+}
 
 switch ($module) {
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'dashboard':
         $today = date('Y-m-d');
-        $st = $db->prepare("SELECT id,full_name,email,mobile,profile_image,service_category,rating,total_reviews,is_verified,available_balance FROM technicians WHERE id=?");
-        $st->execute([$tid]); $profile = $st->fetch(PDO::FETCH_ASSOC);
+        $wallet = getWallet($db, $techUserId);
 
-        $st = $db->prepare("SELECT COUNT(*) as total,SUM(status='ongoing') as ongoing,SUM(status='completed') as completed FROM jobs WHERE technician_id=? AND job_date=?");
-        $st->execute([$tid,$today]); $jc = $st->fetch(PDO::FETCH_ASSOC);
+        // Profile
+        $st = $db->prepare("
+            SELECT u.name AS full_name, u.email, u.phone AS mobile,
+                   t.rating, t.total_jobs, t.kyc_status, t.availability_status,
+                   up.profile_image,
+                   GROUP_CONCAT(s.name ORDER BY s.name SEPARATOR ', ') AS service_category
+            FROM   technicians t
+            JOIN   users u ON t.user_id = u.id
+            LEFT JOIN user_profiles up ON u.id = up.user_id
+            LEFT JOIN technician_services ts ON t.id = ts.technician_id
+            LEFT JOIN services s             ON ts.service_id = s.id
+            WHERE  t.id = ?
+            GROUP  BY t.id, u.id, up.profile_image
+        ");
+        $st->execute([$tid]);
+        $profile = $st->fetch(PDO::FETCH_ASSOC);
+        $profile['available_balance'] = (float) $wallet['balance'];
 
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND DATE(transaction_date)=? AND type='credit'");
-        $st->execute([$tid,$today]); $todayE = $st->fetch(PDO::FETCH_ASSOC)['t'];
+        // Today's job counts from bookings
+        $st = $db->prepare("
+            SELECT COUNT(*) AS total,
+                   SUM(status = 'ongoing') AS ongoing,
+                   SUM(status = 'completed') AS completed
+            FROM   bookings
+            WHERE  assigned_technician_id = ? AND preferred_date = ?
+        ");
+        $st->execute([$tid, $today]);
+        $jc = $st->fetch(PDO::FETCH_ASSOC);
 
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND MONTH(transaction_date)=MONTH(CURDATE()) AND YEAR(transaction_date)=YEAR(CURDATE()) AND type='credit'");
-        $st->execute([$tid]); $monthE = $st->fetch(PDO::FETCH_ASSOC)['t'];
+        // Today's earnings
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  DATE(wt.created_at) = ?
+        ");
+        $st->execute([$techUserId, $today]);
+        $todayEarnings = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
 
-        $st = $db->prepare("SELECT j.*,c.name as customer_name,c.address FROM jobs j JOIN customers c ON j.customer_id=c.id WHERE j.technician_id=? AND j.job_date=? ORDER BY j.start_time");
-        $st->execute([$tid,$today]); $schedule = $st->fetchAll(PDO::FETCH_ASSOC);
+        // Month earnings
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  MONTH(wt.created_at) = MONTH(CURDATE())
+              AND  YEAR(wt.created_at)  = YEAR(CURDATE())
+        ");
+        $st->execute([$techUserId]);
+        $monthEarnings = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
 
-        $st = $db->prepare("SELECT j.*,c.name as customer_name FROM jobs j JOIN customers c ON j.customer_id=c.id WHERE j.technician_id=? AND j.status='ongoing' LIMIT 5");
-        $st->execute([$tid]); $ongoing = $st->fetchAll(PDO::FETCH_ASSOC);
+        // Total withdrawn
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   withdrawal_requests
+            WHERE  user_id = ? AND status = 'paid'
+        ");
+        $st->execute([$techUserId]);
+        $withdrawn = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
 
-        $st = $db->prepare("SELECT SUM(status='new') as new_count,SUM(status='ongoing') as ongoing_count,SUM(status='completed') as completed_count FROM jobs WHERE technician_id=?");
-        $st->execute([$tid]); $jobStatus = $st->fetch(PDO::FETCH_ASSOC);
+        // Today's schedule (assigned bookings)
+        $st = $db->prepare("
+            SELECT b.id, b.booking_code, s.name AS service_type,
+                   b.problem_description AS description,
+                   b.preferred_time AS start_time,
+                   b.status, b.final_amount AS amount,
+                   u.name AS customer_name, a.address_line AS address
+            FROM   bookings b
+            JOIN   customers c  ON b.customer_id = c.id
+            JOIN   users u      ON c.user_id = u.id
+            JOIN   services s   ON b.service_id = s.id
+            JOIN   addresses a  ON b.address_id = a.id
+            WHERE  b.assigned_technician_id = ? AND b.preferred_date = ?
+            ORDER  BY b.preferred_time
+        ");
+        $st->execute([$tid, $today]);
+        $schedule = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND type='debit'");
-        $st->execute([$tid]); $withdrawn = $st->fetch(PDO::FETCH_ASSOC)['t'];
+        // Ongoing bookings
+        $st = $db->prepare("
+            SELECT b.id, b.booking_code, s.name AS service_type,
+                   b.problem_description AS description, b.status,
+                   u.name AS customer_name
+            FROM   bookings b
+            JOIN   customers c ON b.customer_id = c.id
+            JOIN   users u     ON c.user_id = u.id
+            JOIN   services s  ON b.service_id = s.id
+            WHERE  b.assigned_technician_id = ? AND b.status = 'ongoing'
+            LIMIT  5
+        ");
+        $st->execute([$tid]);
+        $ongoing = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        $st = $db->prepare("SELECT * FROM notifications WHERE technician_id=? ORDER BY created_at DESC LIMIT 4");
-        $st->execute([$tid]); $notifs = $st->fetchAll(PDO::FETCH_ASSOC);
+        // All-time job status counts
+        $st = $db->prepare("
+            SELECT SUM(status IN ('new','broadcasted')) AS new_count,
+                   SUM(status = 'ongoing')              AS ongoing_count,
+                   SUM(status = 'completed')            AS completed_count
+            FROM   bookings
+            WHERE  assigned_technician_id = ?
+        ");
+        $st->execute([$tid]);
+        $jobStatus = $st->fetch(PDO::FETCH_ASSOC);
 
-        $st = $db->prepare("SELECT COUNT(*) as cnt FROM notifications WHERE technician_id=? AND is_read=FALSE");
-        $st->execute([$tid]); $unread = $st->fetch(PDO::FETCH_ASSOC)['cnt'];
+        // Recent notifications
+        $st = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 4");
+        $st->execute([$techUserId]);
+        $notifs = $st->fetchAll(PDO::FETCH_ASSOC);
 
-        echo json_encode(["status"=>"success","profile"=>$profile,
-            "stats"=>["today_jobs"=>(int)$jc['total'],"today_ongoing"=>(int)$jc['ongoing'],"today_completed"=>(int)$jc['completed'],
-                "today_earnings"=>(float)$todayE,"month_earnings"=>(float)$monthE,"total_withdrawn"=>(float)$withdrawn,
-                "rating"=>(float)$profile['rating'],"total_reviews"=>(int)$profile['total_reviews']],
-            "schedule"=>$schedule,"ongoing_jobs"=>$ongoing,"job_status"=>$jobStatus,
-            "notifications"=>$notifs,"unread_count"=>(int)$unread]);
+        $st = $db->prepare("SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0");
+        $st->execute([$techUserId]);
+        $unread = (int) $st->fetch(PDO::FETCH_ASSOC)['cnt'];
+
+        echo json_encode([
+            'status'        => 'success',
+            'profile'       => $profile,
+            'stats'         => [
+                'today_jobs'      => (int) $jc['total'],
+                'today_ongoing'   => (int) $jc['ongoing'],
+                'today_completed' => (int) $jc['completed'],
+                'today_earnings'  => $todayEarnings,
+                'month_earnings'  => $monthEarnings,
+                'total_withdrawn' => $withdrawn,
+                'wallet_balance'  => (float) $wallet['balance'],
+                'rating'          => (float) ($profile['rating'] ?? 0),
+                'total_jobs'      => (int) ($profile['total_jobs'] ?? 0),
+            ],
+            'schedule'      => $schedule,
+            'ongoing_jobs'  => $ongoing,
+            'job_status'    => $jobStatus,
+            'notifications' => $notifs,
+            'unread_count'  => $unread,
+        ]);
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'jobs':
         if ($method === 'GET') {
             $status = $_GET['status'] ?? 'new';
+
             if ($status === 'new') {
-                // Unassigned jobs any technician can claim
-                $st = $db->prepare("SELECT j.*,c.name as customer_name,c.phone as customer_phone,c.address FROM jobs j JOIN customers c ON j.customer_id=c.id WHERE j.status='new' AND (j.technician_id=0 OR j.technician_id IS NULL) ORDER BY j.job_date,j.start_time");
-                $st->execute();
+                // Pending broadcasts for this technician
+                $st = $db->prepare("
+                    SELECT b.id, b.booking_code, bb.id AS broadcast_id,
+                           s.name AS service_type,
+                           b.problem_description AS description,
+                           b.preferred_date AS job_date,
+                           b.preferred_time AS start_time,
+                           b.status, b.final_amount AS amount,
+                           u.name  AS customer_name,
+                           u.phone AS customer_phone,
+                           a.address_line AS address,
+                           p.pincode,
+                           bb.is_featured_priority,
+                           bb.notification_priority
+                    FROM   booking_broadcasts bb
+                    JOIN   bookings b   ON bb.booking_id = b.id
+                    JOIN   customers c  ON b.customer_id = c.id
+                    JOIN   users u      ON c.user_id     = u.id
+                    JOIN   services s   ON b.service_id  = s.id
+                    JOIN   addresses a  ON b.address_id  = a.id
+                    JOIN   pincodes p   ON a.pincode_id  = p.id
+                    WHERE  bb.technician_id   = ?
+                      AND  bb.response_status = 'pending'
+                      AND  b.status IN ('new', 'broadcasted')
+                    ORDER  BY bb.notification_priority DESC, b.created_at ASC
+                ");
+                $st->execute([$tid]);
             } else {
-                $st = $db->prepare("SELECT j.*,c.name as customer_name,c.phone as customer_phone,c.address FROM jobs j JOIN customers c ON j.customer_id=c.id WHERE j.technician_id=? AND j.status=? ORDER BY j.job_date DESC,j.start_time");
-                $st->execute([$tid, $status]);
+                // Accepted / ongoing / completed / cancelled bookings
+                $statusMap = [
+                    'ongoing'   => ['accepted', 'assigned', 'arrived', 'ongoing'],
+                    'completed' => ['completed'],
+                    'cancelled' => ['cancelled'],
+                ];
+                $statusList = $statusMap[$status] ?? [$status];
+                $placeholders = implode(',', array_fill(0, count($statusList), '?'));
+
+                $st = $db->prepare("
+                    SELECT b.id, b.booking_code,
+                           s.name  AS service_type,
+                           b.problem_description AS description,
+                           b.preferred_date AS job_date,
+                           b.preferred_time AS start_time,
+                           b.status, b.final_amount AS amount,
+                           u.name  AS customer_name,
+                           u.phone AS customer_phone,
+                           a.address_line AS address,
+                           p.pincode
+                    FROM   bookings b
+                    JOIN   customers c ON b.customer_id = c.id
+                    JOIN   users u     ON c.user_id     = u.id
+                    JOIN   services s  ON b.service_id  = s.id
+                    JOIN   addresses a ON b.address_id  = a.id
+                    JOIN   pincodes p  ON a.pincode_id  = p.id
+                    WHERE  b.assigned_technician_id = ?
+                      AND  b.status IN ($placeholders)
+                    ORDER  BY b.preferred_date DESC, b.preferred_time DESC
+                ");
+                $st->execute(array_merge([$tid], $statusList));
             }
             $jobs = $st->fetchAll(PDO::FETCH_ASSOC);
 
-            $st = $db->prepare("SELECT (SELECT COUNT(*) FROM jobs WHERE status='new' AND (technician_id=0 OR technician_id IS NULL)) as new_count, SUM(status='ongoing' AND technician_id=?) as ongoing_count, SUM(status='completed' AND technician_id=?) as completed_count FROM jobs");
-            $st->execute([$tid,$tid]); $counts = $st->fetch(PDO::FETCH_ASSOC);
-            echo json_encode(["status"=>"success","jobs"=>$jobs,"counts"=>$counts]);
+            // Tab counts
+            $st = $db->prepare("
+                SELECT
+                    (SELECT COUNT(*) FROM booking_broadcasts WHERE technician_id = ? AND response_status = 'pending') AS new_count,
+                    SUM(b.status IN ('accepted','assigned','arrived','ongoing') AND b.assigned_technician_id = ?)     AS ongoing_count,
+                    SUM(b.status = 'completed'  AND b.assigned_technician_id = ?)                                     AS completed_count
+                FROM bookings b
+            ");
+            $st->execute([$tid, $tid, $tid]);
+            $counts = $st->fetch(PDO::FETCH_ASSOC);
+
+            echo json_encode(['status' => 'success', 'jobs' => $jobs, 'counts' => $counts]);
+
         } else {
-            $action = $d['action'] ?? ''; $jid = (int)($d['job_id'] ?? 0);
+            // POST actions: accept or complete
+            $action = $d['action'] ?? '';
+            $jobId  = (int) ($d['job_id'] ?? 0);   // booking_id
+
             if ($action === 'accept') {
-                // Get technician name + phone
-                $tInfo = $db->prepare("SELECT full_name, mobile FROM technicians WHERE id=?");
-                $tInfo->execute([$tid]); $tech = $tInfo->fetch(PDO::FETCH_ASSOC);
-                $techName  = $tech['full_name'] ?? '';
-                $techPhone = $tech['mobile']    ?? '';
-
-                // Claim unassigned job
-                $db->prepare("UPDATE jobs SET status='ongoing', technician_id=? WHERE id=? AND (technician_id=0 OR technician_id IS NULL)")->execute([$tid,$jid]);
-
-                // Update kwikar_bookings with status + technician info
-                $row = $db->prepare("SELECT booking_id FROM jobs WHERE id=?");
-                $row->execute([$jid]); $r = $row->fetch(PDO::FETCH_ASSOC);
-                if ($r && $r['booking_id']) {
-                    $db->prepare("UPDATE kwikar_bookings SET status='confirmed', technician_id=?, technician_name=?, technician_phone=? WHERE id=?")->execute([$tid, $techName, $techPhone, $r['booking_id']]);
+                // Check broadcast exists and is pending
+                $st = $db->prepare("
+                    SELECT bb.id FROM booking_broadcasts bb
+                    WHERE  bb.booking_id = ? AND bb.technician_id = ? AND bb.response_status = 'pending'
+                    LIMIT  1
+                ");
+                $st->execute([$jobId, $tid]);
+                if (!$st->fetchColumn()) {
+                    echo json_encode(['status' => 'error', 'message' => 'Broadcast not found or already responded']);
+                    break;
                 }
-                echo json_encode(["status"=>"success","message"=>"Job accepted"]);
+
+                $db->beginTransaction();
+                try {
+                    // Accept this broadcast
+                    $db->prepare("
+                        UPDATE booking_broadcasts
+                        SET    response_status = 'accepted', accepted_at = NOW()
+                        WHERE  booking_id = ? AND technician_id = ?
+                    ")->execute([$jobId, $tid]);
+
+                    // Expire all other pending broadcasts for this booking
+                    $db->prepare("
+                        UPDATE booking_broadcasts
+                        SET    response_status = 'expired'
+                        WHERE  booking_id = ? AND technician_id != ? AND response_status = 'pending'
+                    ")->execute([$jobId, $tid]);
+
+                    // Assign booking
+                    $db->prepare("
+                        UPDATE bookings
+                        SET    assigned_technician_id = ?, status = 'accepted'
+                        WHERE  id = ? AND status IN ('new', 'broadcasted')
+                    ")->execute([$tid, $jobId]);
+
+                    // Status log
+                    $db->prepare("
+                        INSERT INTO booking_status_logs (booking_id, status, changed_by, note)
+                        VALUES (?, 'accepted', ?, 'Technician accepted job')
+                    ")->execute([$jobId, $techUserId]);
+
+                    $db->commit();
+                    echo json_encode(['status' => 'success', 'message' => 'Job accepted']);
+                } catch (Exception $ex) {
+                    $db->rollBack();
+                    echo json_encode(['status' => 'error', 'message' => 'Accept failed: ' . $ex->getMessage()]);
+                }
+
             } elseif ($action === 'complete') {
-                $db->prepare("UPDATE jobs SET status='completed' WHERE id=? AND technician_id=?")->execute([$jid,$tid]);
-                $row = $db->prepare("SELECT booking_id FROM jobs WHERE id=?");
-                $row->execute([$jid]); $r = $row->fetch(PDO::FETCH_ASSOC);
-                if ($r && $r['booking_id']) {
-                    $db->prepare("UPDATE kwikar_bookings SET status='completed' WHERE id=?")->execute([$r['booking_id']]);
+                $db->beginTransaction();
+                try {
+                    $db->prepare("
+                        UPDATE bookings SET status = 'completed'
+                        WHERE  id = ? AND assigned_technician_id = ?
+                    ")->execute([$jobId, $tid]);
+
+                    $db->prepare("
+                        INSERT INTO booking_status_logs (booking_id, status, changed_by, note)
+                        VALUES (?, 'completed', ?, 'Job completed by technician')
+                    ")->execute([$jobId, $techUserId]);
+
+                    // Increment technician job count
+                    $db->prepare("UPDATE technicians SET total_jobs = total_jobs + 1 WHERE id = ?")->execute([$tid]);
+
+                    $db->commit();
+                    echo json_encode(['status' => 'success', 'message' => 'Job completed']);
+                } catch (Exception $ex) {
+                    $db->rollBack();
+                    echo json_encode(['status' => 'error', 'message' => 'Complete failed: ' . $ex->getMessage()]);
                 }
-                echo json_encode(["status"=>"success","message"=>"Job completed"]);
-            } else { echo json_encode(["status"=>"error","message"=>"Invalid action"]); }
+
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
+            }
         }
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'earnings':
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND type='credit' AND MONTH(transaction_date)=MONTH(CURDATE()) AND YEAR(transaction_date)=YEAR(CURDATE())");
-        $st->execute([$tid]); $totalE = $st->fetch(PDO::FETCH_ASSOC)['t'];
-        $st = $db->prepare("SELECT COUNT(*) as cnt FROM jobs WHERE technician_id=? AND status='completed'");
-        $st->execute([$tid]); $cJobs = $st->fetch(PDO::FETCH_ASSOC)['cnt'];
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND status='pending'");
-        $st->execute([$tid]); $pending = $st->fetch(PDO::FETCH_ASSOC)['t'];
-        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND type='debit' AND status='paid_out'");
-        $st->execute([$tid]); $payouts = $st->fetch(PDO::FETCH_ASSOC)['t'];
-        $st = $db->prepare("SELECT DATE(transaction_date) as day,SUM(amount) as amt FROM transactions WHERE technician_id=? AND type='credit' AND MONTH(transaction_date)=MONTH(CURDATE()) GROUP BY DATE(transaction_date) ORDER BY day");
-        $st->execute([$tid]); $chart = $st->fetchAll(PDO::FETCH_ASSOC);
-        $st = $db->prepare("SELECT * FROM transactions WHERE technician_id=? ORDER BY transaction_date DESC LIMIT 5");
-        $st->execute([$tid]); $recent = $st->fetchAll(PDO::FETCH_ASSOC);
-        $st = $db->prepare("SELECT available_balance FROM technicians WHERE id=?");
-        $st->execute([$tid]); $bal = $st->fetch(PDO::FETCH_ASSOC)['available_balance'];
-        $st = $db->prepare("SELECT SUM(CASE WHEN j.status='completed' THEN j.amount ELSE 0 END) as completed,SUM(CASE WHEN j.status IN('ongoing','upcoming') THEN j.amount ELSE 0 END) as pending,SUM(CASE WHEN j.status='cancelled' THEN j.amount ELSE 0 END) as cancelled FROM jobs j WHERE j.technician_id=?");
-        $st->execute([$tid]); $summary = $st->fetch(PDO::FETCH_ASSOC);
-        echo json_encode(["status"=>"success","stats"=>["total_earnings"=>(float)$totalE,"completed_jobs"=>(int)$cJobs,"pending_payout"=>(float)$pending,"total_payouts"=>(float)$payouts,"wallet_balance"=>(float)$bal],"chart"=>$chart,"recent_transactions"=>$recent,"summary"=>$summary]);
+        $wallet = getWallet($db, $techUserId);
+
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  MONTH(wt.created_at) = MONTH(CURDATE())
+              AND  YEAR(wt.created_at)  = YEAR(CURDATE())
+        ");
+        $st->execute([$techUserId]);
+        $totalEarnings = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
+
+        $st = $db->prepare("SELECT COUNT(*) AS cnt FROM bookings WHERE assigned_technician_id = ? AND status = 'completed'");
+        $st->execute([$tid]);
+        $completedJobs = (int) $st->fetch(PDO::FETCH_ASSOC)['cnt'];
+
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   withdrawal_requests
+            WHERE  user_id = ? AND status IN ('pending', 'approved')
+        ");
+        $st->execute([$techUserId]);
+        $pendingPayout = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
+
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(amount), 0) AS t
+            FROM   withdrawal_requests
+            WHERE  user_id = ? AND status = 'paid'
+        ");
+        $st->execute([$techUserId]);
+        $totalPayouts = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
+
+        // Daily chart (current month)
+        $st = $db->prepare("
+            SELECT DATE(wt.created_at) AS day, SUM(wt.amount) AS amt
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  MONTH(wt.created_at) = MONTH(CURDATE())
+              AND  YEAR(wt.created_at)  = YEAR(CURDATE())
+            GROUP  BY DATE(wt.created_at)
+            ORDER  BY day
+        ");
+        $st->execute([$techUserId]);
+        $chart = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // Recent transactions
+        $st = $db->prepare("
+            SELECT wt.*, w.wallet_type
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ?
+            ORDER  BY wt.created_at DESC
+            LIMIT  5
+        ");
+        $st->execute([$techUserId]);
+        $recent = $st->fetchAll(PDO::FETCH_ASSOC);
+
+        // Job amount summary
+        $st = $db->prepare("
+            SELECT
+                SUM(CASE WHEN status = 'completed'                          THEN COALESCE(final_amount, 0) ELSE 0 END) AS completed,
+                SUM(CASE WHEN status IN ('ongoing','accepted','arrived')     THEN COALESCE(final_amount, 0) ELSE 0 END) AS pending,
+                SUM(CASE WHEN status = 'cancelled'                          THEN COALESCE(final_amount, 0) ELSE 0 END) AS cancelled
+            FROM bookings
+            WHERE assigned_technician_id = ?
+        ");
+        $st->execute([$tid]);
+        $summary = $st->fetch(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'status' => 'success',
+            'stats'  => [
+                'total_earnings'  => $totalEarnings,
+                'completed_jobs'  => $completedJobs,
+                'pending_payout'  => $pendingPayout,
+                'total_payouts'   => $totalPayouts,
+                'wallet_balance'  => (float) $wallet['balance'],
+            ],
+            'chart'               => $chart,
+            'recent_transactions' => $recent,
+            'summary'             => $summary,
+        ]);
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'wallet':
+        $wallet = getWallet($db, $techUserId);
+
         if ($method === 'GET') {
-            $st = $db->prepare("SELECT available_balance FROM technicians WHERE id=?");
-            $st->execute([$tid]); $bal = $st->fetch(PDO::FETCH_ASSOC)['available_balance'];
-            $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND type='credit' AND MONTH(transaction_date)=MONTH(CURDATE())");
-            $st->execute([$tid]); $monthE = $st->fetch(PDO::FETCH_ASSOC)['t'];
-            $st = $db->prepare("SELECT COALESCE(SUM(amount),0) as t FROM transactions WHERE technician_id=? AND status='pending'");
-            $st->execute([$tid]); $pend = $st->fetch(PDO::FETCH_ASSOC)['t'];
-            $st = $db->prepare("SELECT * FROM transactions WHERE technician_id=? ORDER BY transaction_date DESC");
-            $st->execute([$tid]); $history = $st->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode(["status"=>"success","available_balance"=>(float)$bal,"month_earnings"=>(float)$monthE,"pending_payout"=>(float)$pend,"transactions"=>$history]);
+            $st = $db->prepare("
+                SELECT COALESCE(SUM(amount), 0) AS t
+                FROM   wallet_transactions wt
+                JOIN   wallets w ON wt.wallet_id = w.id
+                WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+                  AND  MONTH(wt.created_at) = MONTH(CURDATE())
+            ");
+            $st->execute([$techUserId]);
+            $monthEarnings = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
+
+            $st = $db->prepare("
+                SELECT COALESCE(SUM(amount), 0) AS t
+                FROM   withdrawal_requests
+                WHERE  user_id = ? AND status IN ('pending', 'approved')
+            ");
+            $st->execute([$techUserId]);
+            $pendingPayout = (float) $st->fetch(PDO::FETCH_ASSOC)['t'];
+
+            $st = $db->prepare("
+                SELECT wt.*, w.wallet_type
+                FROM   wallet_transactions wt
+                JOIN   wallets w ON wt.wallet_id = w.id
+                WHERE  w.user_id = ?
+                ORDER  BY wt.created_at DESC
+            ");
+            $st->execute([$techUserId]);
+            $history = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode([
+                'status'            => 'success',
+                'available_balance' => (float) $wallet['balance'],
+                'month_earnings'    => $monthEarnings,
+                'pending_payout'    => $pendingPayout,
+                'transactions'      => $history,
+            ]);
+
         } else {
-            $d = json_decode(file_get_contents("php://input"), true);
-            $amount = floatval($d['amount'] ?? 0);
-            if ($amount <= 0) { echo json_encode(["status"=>"error","message"=>"Invalid amount"]); exit; }
-            $st = $db->prepare("SELECT available_balance FROM technicians WHERE id=?");
-            $st->execute([$tid]); $bal = $st->fetch(PDO::FETCH_ASSOC)['available_balance'];
-            if ($amount > $bal) { echo json_encode(["status"=>"error","message"=>"Insufficient balance"]); exit; }
-            $newBal = $bal - $amount; $txnId = 'TXN'.time();
-            $db->prepare("UPDATE technicians SET available_balance=? WHERE id=?")->execute([$newBal,$tid]);
-            $db->prepare("INSERT INTO transactions (transaction_id,technician_id,type,description,amount,balance_after,status) VALUES (?,?,'debit','Withdrawal to Bank',?,?,'paid_out')")->execute([$txnId,$tid,$amount,$newBal]);
-            echo json_encode(["status"=>"success","message"=>"₹$amount withdrawn successfully","new_balance"=>$newBal]);
+            $amount = round(floatval($d['amount'] ?? 0), 2);
+            if ($amount <= 0) { echo json_encode(['status' => 'error', 'message' => 'Invalid amount']); break; }
+
+            $balance = (float) $wallet['balance'];
+            if ($amount > $balance) { echo json_encode(['status' => 'error', 'message' => 'Insufficient balance']); break; }
+
+            $walletId = $wallet['id'];
+            $newBalance = round($balance - $amount, 2);
+
+            $db->beginTransaction();
+            try {
+                $db->prepare("UPDATE wallets SET balance = ? WHERE id = ?")->execute([$newBalance, $walletId]);
+                $db->prepare("
+                    INSERT INTO wallet_transactions (wallet_id, reference_type, transaction_type, amount, note)
+                    VALUES (?, 'withdrawal', 'debit', ?, 'Withdrawal to bank')
+                ")->execute([$walletId, $amount]);
+                $wtId = (int) $db->lastInsertId();
+                $db->prepare("
+                    INSERT INTO withdrawal_requests (user_id, wallet_id, amount, status)
+                    VALUES (?, ?, ?, 'pending')
+                ")->execute([$techUserId, $walletId, $amount]);
+                $db->commit();
+                echo json_encode([
+                    'status'      => 'success',
+                    'message'     => "₹{$amount} withdrawal requested successfully",
+                    'new_balance' => $newBalance,
+                ]);
+            } catch (Exception $ex) {
+                $db->rollBack();
+                echo json_encode(['status' => 'error', 'message' => 'Withdrawal failed: ' . $ex->getMessage()]);
+            }
         }
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'notifications':
         if ($method === 'GET') {
             $filter = $_GET['filter'] ?? 'all';
-            // technician_id=0 means broadcast to all technicians
-            $params = [$tid, 0];
-            $where = "(technician_id=? OR technician_id=?)";
-            if ($filter !== 'all') { $where .= " AND type=?"; $params[] = $filter; }
+            $params = [$techUserId];
+            $where  = 'user_id = ?';
+            if ($filter !== 'all') { $where .= ' AND type = ?'; $params[] = $filter; }
+
             $st = $db->prepare("SELECT * FROM notifications WHERE $where ORDER BY created_at DESC");
-            $st->execute($params); $notes = $st->fetchAll(PDO::FETCH_ASSOC);
-            $st = $db->prepare("SELECT COUNT(*) as all_count, SUM(type='job') as job_count, SUM(type='earning') as earning_count, SUM(type='system') as system_count FROM notifications WHERE technician_id=? OR technician_id=0");
-            $st->execute([$tid]); $counts = $st->fetch(PDO::FETCH_ASSOC);
-            $unreadSt = $db->prepare("SELECT COUNT(*) as cnt FROM notifications WHERE (technician_id=? OR technician_id=0) AND is_read=0");
-            $unreadSt->execute([$tid]); $unread = $unreadSt->fetch(PDO::FETCH_ASSOC)['cnt'];
-            echo json_encode(["status"=>"success","notifications"=>$notes,"counts"=>$counts,"unread_count"=>(int)$unread]);
+            $st->execute($params);
+            $notes = $st->fetchAll(PDO::FETCH_ASSOC);
+
+            $st = $db->prepare("
+                SELECT COUNT(*) AS all_count,
+                       SUM(type = 'booking')      AS booking_count,
+                       SUM(type = 'earning')      AS earning_count,
+                       SUM(type = 'subscription') AS subscription_count,
+                       SUM(type = 'system')       AS system_count
+                FROM   notifications
+                WHERE  user_id = ?
+            ");
+            $st->execute([$techUserId]);
+            $counts = $st->fetch(PDO::FETCH_ASSOC);
+
+            $st = $db->prepare("SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND is_read = 0");
+            $st->execute([$techUserId]);
+            $unread = (int) $st->fetch(PDO::FETCH_ASSOC)['cnt'];
+
+            echo json_encode([
+                'status'       => 'success',
+                'notifications' => $notes,
+                'counts'       => $counts,
+                'unread_count' => $unread,
+            ]);
+
         } else {
-            $d = json_decode(file_get_contents("php://input"), true);
             $action = $d['action'] ?? '';
             if ($action === 'mark_all_read') {
-                $db->prepare("UPDATE notifications SET is_read=TRUE WHERE technician_id=?")->execute([$tid]);
-                echo json_encode(["status"=>"success"]);
+                $db->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ?")->execute([$techUserId]);
+                echo json_encode(['status' => 'success']);
             } elseif ($action === 'mark_read') {
-                $db->prepare("UPDATE notifications SET is_read=TRUE WHERE id=? AND technician_id=?")->execute([$d['id']??0,$tid]);
-                echo json_encode(["status"=>"success"]);
+                $db->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?")
+                   ->execute([(int) ($d['id'] ?? 0), $techUserId]);
+                echo json_encode(['status' => 'success']);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
             }
         }
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'support':
         if ($method === 'GET') {
-            $st = $db->prepare("SELECT * FROM support_tickets WHERE technician_id=? ORDER BY created_at DESC");
-            $st->execute([$tid]); $tickets = $st->fetchAll(PDO::FETCH_ASSOC);
-            echo json_encode(["status"=>"success","tickets"=>$tickets]);
+            $st = $db->prepare("SELECT * FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC");
+            $st->execute([$techUserId]);
+            echo json_encode(['status' => 'success', 'tickets' => $st->fetchAll(PDO::FETCH_ASSOC)]);
         } else {
-            $d = json_decode(file_get_contents("php://input"), true);
             $subject = trim($d['subject'] ?? '');
-            if (!$subject) { echo json_encode(["status"=>"error","message"=>"Subject required"]); exit; }
-            $ticketId = 'KWK'.rand(100000,999999);
-            $db->prepare("INSERT INTO support_tickets (ticket_id,technician_id,subject,description) VALUES (?,?,?,?)")->execute([$ticketId,$tid,$subject,$d['description']??'']);
-            echo json_encode(["status"=>"success","message"=>"Ticket raised","ticket_id"=>$ticketId]);
+            if (!$subject) { echo json_encode(['status' => 'error', 'message' => 'Subject required']); break; }
+            $db->prepare("
+                INSERT INTO support_tickets (user_id, subject, description, priority)
+                VALUES (?, ?, ?, 'medium')
+            ")->execute([$techUserId, $subject, $d['description'] ?? '']);
+            $ticketId = (int) $db->lastInsertId();
+            echo json_encode(['status' => 'success', 'message' => 'Ticket raised', 'ticket_id' => $ticketId]);
         }
         break;
 
+    // ════════════════════════════════════════════════════════════════════════
     case 'profile':
         if ($method === 'GET') {
-            $st = $db->prepare("SELECT t.*,b.account_holder,b.account_number,b.ifsc_code,b.bank_name,b.upi_id,s.language,s.app_theme,s.offline_mode,s.auto_logout,s.two_step_verification FROM technicians t LEFT JOIN bank_details b ON t.id=b.technician_id LEFT JOIN user_settings s ON t.id=s.technician_id WHERE t.id=?");
-            $st->execute([$tid]); $profile = $st->fetch(PDO::FETCH_ASSOC);
-            unset($profile['password']);
-            echo json_encode(["status"=>"success","profile"=>$profile]);
+            $st = $db->prepare("
+                SELECT u.name AS full_name, u.email, u.phone AS mobile,
+                       t.id, t.experience_years, t.rating, t.total_jobs,
+                       t.kyc_status, t.availability_status,
+                       t.is_featured, t.priority_lead_enabled, t.status,
+                       up.profile_image, up.gender, up.dob, up.bio,
+                       bd.account_holder, bd.account_number, bd.ifsc_code, bd.bank_name, bd.upi_id,
+                       us.language, us.app_theme, us.offline_mode, us.auto_logout, us.two_step_verification,
+                       GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ') AS service_category,
+                       GROUP_CONCAT(DISTINCT p.pincode ORDER BY p.pincode SEPARATOR ', ') AS pincodes
+                FROM   technicians t
+                JOIN   users u   ON t.user_id = u.id
+                LEFT JOIN user_profiles up ON u.id = up.user_id
+                LEFT JOIN bank_details  bd ON u.id = bd.user_id
+                LEFT JOIN user_settings us ON u.id = us.user_id
+                LEFT JOIN technician_services ts ON t.id = ts.technician_id
+                LEFT JOIN services s             ON ts.service_id = s.id
+                LEFT JOIN technician_pincodes tp ON t.id = tp.technician_id
+                LEFT JOIN pincodes p             ON tp.pincode_id = p.id
+                WHERE  t.id = ?
+                GROUP  BY t.id, u.id, up.profile_image, up.gender, up.dob, up.bio,
+                          bd.account_holder, bd.account_number, bd.ifsc_code, bd.bank_name, bd.upi_id,
+                          us.language, us.app_theme, us.offline_mode, us.auto_logout, us.two_step_verification
+            ");
+            $st->execute([$tid]);
+            $profile = $st->fetch(PDO::FETCH_ASSOC);
+            $wallet  = getWallet($db, $techUserId);
+            if ($profile) $profile['available_balance'] = (float) $wallet['balance'];
+            echo json_encode(['status' => 'success', 'profile' => $profile]);
+
         } else {
-            $d = json_decode(file_get_contents("php://input"), true);
             $action = $d['action'] ?? 'update_profile';
+
             if ($action === 'update_profile') {
-                $db->prepare("UPDATE technicians SET full_name=?,mobile=?,email=?,service_category=?,experience=?,city=? WHERE id=?")->execute([$d['full_name'],$d['mobile'],$d['email'],$d['service_category'],$d['experience'],$d['city'],$tid]);
-                echo json_encode(["status"=>"success","message"=>"Profile updated"]);
+                $db->prepare("UPDATE users SET name = ?, phone = ?, email = ? WHERE id = ?")
+                   ->execute([$d['full_name'] ?? '', $d['mobile'] ?? '', $d['email'] ?? '', $techUserId]);
+                $db->prepare("UPDATE technicians SET experience_years = ?, availability_status = ? WHERE id = ?")
+                   ->execute([(int) ($d['experience_years'] ?? 0), $d['availability_status'] ?? 'offline', $tid]);
+                echo json_encode(['status' => 'success', 'message' => 'Profile updated']);
+
             } elseif ($action === 'change_password') {
-                $st = $db->prepare("SELECT password FROM technicians WHERE id=?");
-                $st->execute([$tid]); $cur = $st->fetch(PDO::FETCH_ASSOC)['password'];
-                if (!password_verify($d['old_password']??'',$cur)) { echo json_encode(["status"=>"error","message"=>"Old password incorrect"]); exit; }
-                $db->prepare("UPDATE technicians SET password=? WHERE id=?")->execute([password_hash($d['new_password'],PASSWORD_DEFAULT),$tid]);
-                echo json_encode(["status"=>"success","message"=>"Password changed"]);
+                $st = $db->prepare("SELECT pass_pin FROM users WHERE id = ?");
+                $st->execute([$techUserId]);
+                $cur = $st->fetch(PDO::FETCH_ASSOC)['pass_pin'] ?? '';
+                if (!password_verify($d['old_password'] ?? '', $cur)) {
+                    echo json_encode(['status' => 'error', 'message' => 'Old password incorrect']);
+                    break;
+                }
+                $db->prepare("UPDATE users SET pass_pin = ? WHERE id = ?")
+                   ->execute([password_hash($d['new_password'], PASSWORD_DEFAULT), $techUserId]);
+                echo json_encode(['status' => 'success', 'message' => 'Password changed']);
+
             } elseif ($action === 'update_bank') {
-                $db->prepare("INSERT INTO bank_details (technician_id,account_holder,account_number,ifsc_code,bank_name,upi_id) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE account_holder=VALUES(account_holder),account_number=VALUES(account_number),ifsc_code=VALUES(ifsc_code),bank_name=VALUES(bank_name),upi_id=VALUES(upi_id)")->execute([$tid,$d['account_holder'],$d['account_number'],$d['ifsc_code'],$d['bank_name'],$d['upi_id']]);
-                echo json_encode(["status"=>"success","message"=>"Bank details updated"]);
+                $db->prepare("
+                    INSERT INTO bank_details (user_id, account_holder, account_number, ifsc_code, bank_name, upi_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                        account_holder = VALUES(account_holder),
+                        account_number = VALUES(account_number),
+                        ifsc_code      = VALUES(ifsc_code),
+                        bank_name      = VALUES(bank_name),
+                        upi_id         = VALUES(upi_id)
+                ")->execute([
+                    $techUserId,
+                    $d['account_holder'] ?? '', $d['account_number'] ?? '',
+                    $d['ifsc_code'] ?? '',      $d['bank_name'] ?? '',
+                    $d['upi_id'] ?? '',
+                ]);
+                echo json_encode(['status' => 'success', 'message' => 'Bank details updated']);
+
             } elseif ($action === 'update_settings') {
-                $db->prepare("UPDATE user_settings SET language=?,app_theme=?,offline_mode=?,auto_logout=?,two_step_verification=? WHERE technician_id=?")->execute([$d['language']??'English',$d['app_theme']??'Light',$d['offline_mode']?1:0,$d['auto_logout']??30,$d['two_step_verification']?1:0,$tid]);
-                echo json_encode(["status"=>"success","message"=>"Settings updated"]);
+                $db->prepare("
+                    UPDATE user_settings
+                    SET language = ?, app_theme = ?, offline_mode = ?,
+                        auto_logout = ?, two_step_verification = ?
+                    WHERE user_id = ?
+                ")->execute([
+                    $d['language']              ?? 'English',
+                    $d['app_theme']             ?? 'Light',
+                    ($d['offline_mode'] ?? 0)   ? 1 : 0,
+                    (int) ($d['auto_logout']    ?? 30),
+                    ($d['two_step_verification'] ?? 0) ? 1 : 0,
+                    $techUserId,
+                ]);
+                echo json_encode(['status' => 'success', 'message' => 'Settings updated']);
+
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
             }
+        }
+        break;
+
+    // ════════════════════════════════════════════════════════════════════════
+    // Subscription payment with referral commission distribution.
+    //
+    // Revenue split (from subscription fee — NOT from job charges):
+    //   relationship = direct_abd   → ABD gets 25%, Kwikar 75%
+    //   relationship = tech_referral → parent tech 15%, ABD 10%, Kwikar 75%
+    //
+    // Customer job payments go 100% to technician — no deduction.
+    // ════════════════════════════════════════════════════════════════════════
+    case 'pay_subscription':
+        $planId  = (int) ($d['plan_id']  ?? 0);
+        $pcCode  = trim($d['pincode']    ?? '');
+
+        // Resolve plan (fall back to legacy plan_type if plan_id not sent)
+        if ($planId) {
+            $st = $db->prepare("SELECT * FROM subscription_plans WHERE id = ? AND status = 'active' LIMIT 1");
+            $st->execute([$planId]);
+            $plan = $st->fetch(PDO::FETCH_ASSOC);
+        } else {
+            // Legacy: plan_type 'fix' / 'flex'
+            $planType = trim($d['plan_type'] ?? '');
+            $st = $db->prepare("SELECT * FROM subscription_plans WHERE name = ? AND status = 'active' LIMIT 1");
+            $st->execute([$planType]);
+            $plan = $st->fetch(PDO::FETCH_ASSOC);
+
+            // Auto-seed default plans if table is empty
+            if (!$plan) {
+                $db->exec("INSERT IGNORE INTO subscription_plans (name, description, duration_days, price, status) VALUES
+                    ('fix',  'Fixed area plan — unlimited jobs in pincode',  30, 499.00, 'active'),
+                    ('flex', 'Flexible plan — per service category',         30, 149.00, 'active')");
+                $st->execute([$planType]);
+                $plan = $st->fetch(PDO::FETCH_ASSOC);
+            }
+        }
+
+        if (!$plan) {
+            echo json_encode(['status' => 'error', 'message' => 'Plan not found or inactive']);
+            break;
+        }
+
+        // Resolve pincode for the subscription
+        $pincodeId = null;
+        if ($pcCode) {
+            $st = $db->prepare("SELECT id FROM pincodes WHERE pincode = ?");
+            $st->execute([$pcCode]);
+            $pincodeId = $st->fetchColumn() ?: null;
+        }
+        if (!$pincodeId) {
+            // Use technician's first active pincode
+            $st = $db->prepare("SELECT pincode_id FROM technician_pincodes WHERE technician_id = ? AND is_active = 1 LIMIT 1");
+            $st->execute([$tid]);
+            $pincodeId = $st->fetchColumn() ?: null;
+        }
+        if (!$pincodeId) {
+            echo json_encode(['status' => 'error', 'message' => 'No pincode linked to technician']);
+            break;
+        }
+
+        $subAmount = (float) $plan['price'];
+        $planName  = strtoupper($plan['name']);
+        $duration  = (int) $plan['duration_days'];
+        $startDate = date('Y-m-d');
+        $endDate   = date('Y-m-d', strtotime("+{$duration} days"));
+
+        // Referral relationship for this technician
+        $st = $db->prepare("SELECT * FROM referral_relationships WHERE technician_id = ? LIMIT 1");
+        $st->execute([$tid]);
+        $referral = $st->fetch(PDO::FETCH_ASSOC);
+
+        $commParentTech = 0.00;
+        $commAbd        = 0.00;
+        $abdUserId      = null;
+        $parentTechId   = null;
+
+        if ($referral) {
+            $abdId        = (int) $referral['abd_id'];
+            $parentTechId = !empty($referral['parent_technician_id']) ? (int) $referral['parent_technician_id'] : null;
+            $relType      = $referral['relationship_type'];
+
+            // Get ABD's user_id for wallet credit
+            $st = $db->prepare("SELECT user_id, direct_commission_percent, indirect_commission_percent FROM abds WHERE id = ?");
+            $st->execute([$abdId]);
+            $abdRow = $st->fetch(PDO::FETCH_ASSOC);
+            $abdUserId = $abdRow ? (int) $abdRow['user_id'] : null;
+
+            if ($relType === 'direct_abd') {
+                $commAbd = round($subAmount * ($abdRow['direct_commission_percent'] / 100), 2);
+            } else {
+                // technician_referral
+                $commParentTech = round($subAmount * 0.15, 2);
+                $commAbd        = round($subAmount * ($abdRow['indirect_commission_percent'] / 100), 2);
+            }
+        }
+
+        $kwikarShare = round($subAmount - $commParentTech - $commAbd, 2);
+
+        $db->beginTransaction();
+        try {
+            // Create subscription record
+            $db->prepare("
+                INSERT INTO technician_subscriptions
+                    (technician_id, subscription_plan_id, pincode_id, amount_paid,
+                     start_date, end_date, payment_status, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'paid', 'active')
+            ")->execute([$tid, $plan['id'], $pincodeId, $subAmount, $startDate, $endDate]);
+            $subId = (int) $db->lastInsertId();
+
+            // Commission: platform share
+            $db->prepare("
+                INSERT INTO subscription_commissions
+                    (technician_subscription_id, from_technician_id, to_user_id,
+                     to_user_role, commission_type, commission_percent, amount)
+                VALUES (?, ?, ?, 'kwikar', 'platform', ?, ?)
+            ")->execute([$subId, $tid, $techUserId, round(($kwikarShare / $subAmount) * 100, 2), $kwikarShare]);
+
+            // Commission: parent technician (if applicable)
+            if ($commParentTech > 0 && $parentTechId) {
+                $st = $db->prepare("SELECT user_id FROM technicians WHERE id = ?");
+                $st->execute([$parentTechId]);
+                $parentUserId = (int) $st->fetchColumn();
+
+                $db->prepare("
+                    INSERT INTO subscription_commissions
+                        (technician_subscription_id, from_technician_id, to_user_id,
+                         to_user_role, commission_type, commission_percent, amount)
+                    VALUES (?, ?, ?, 'technician', 'technician_referral', 15.00, ?)
+                ")->execute([$subId, $tid, $parentUserId, $commParentTech]);
+
+                // Credit parent technician's wallet
+                $db->prepare("INSERT IGNORE INTO wallets (user_id, wallet_type, balance) VALUES (?, 'earning', 0.00)")
+                   ->execute([$parentUserId]);
+                $db->prepare("UPDATE wallets SET balance = balance + ? WHERE user_id = ? AND wallet_type = 'earning'")
+                   ->execute([$commParentTech, $parentUserId]);
+                $st = $db->prepare("SELECT id FROM wallets WHERE user_id = ? AND wallet_type = 'earning'");
+                $st->execute([$parentUserId]);
+                $parentWalletId = (int) $st->fetchColumn();
+                $db->prepare("
+                    INSERT INTO wallet_transactions (wallet_id, reference_type, reference_id, transaction_type, amount, note)
+                    VALUES (?, 'subscription', ?, 'credit', ?, ?)
+                ")->execute([
+                    $parentWalletId, $subId, $commParentTech,
+                    "Referral commission — {$planName} plan subscription by Tech #{$tid}",
+                ]);
+
+                // Notification to parent tech
+                $db->prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'earning')")
+                   ->execute([$parentUserId, 'Referral Commission Received', "₹{$commParentTech} credited — {$planName} plan subscription"]);
+            }
+
+            // Commission: ABD
+            if ($commAbd > 0 && $abdUserId) {
+                $commType = ($referral['relationship_type'] ?? '') === 'direct_abd' ? 'direct_abd' : 'indirect_abd';
+                $commPct  = $commType === 'direct_abd'
+                    ? ($abdRow['direct_commission_percent'] ?? 25)
+                    : ($abdRow['indirect_commission_percent'] ?? 10);
+
+                $db->prepare("
+                    INSERT INTO subscription_commissions
+                        (technician_subscription_id, from_technician_id, to_user_id,
+                         to_user_role, commission_type, commission_percent, amount)
+                    VALUES (?, ?, ?, 'abd', ?, ?, ?)
+                ")->execute([$subId, $tid, $abdUserId, $commType, $commPct, $commAbd]);
+
+                // Credit ABD wallet in abds table
+                $db->prepare("UPDATE abds SET wallet_balance = wallet_balance + ? WHERE user_id = ?")
+                   ->execute([$commAbd, $abdUserId]);
+
+                // Notification to ABD
+                $db->prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'earning')")
+                   ->execute([$abdUserId, 'Commission Received', "₹{$commAbd} credited — {$planName} plan subscription by Tech #{$tid}"]);
+            }
+
+            // Update technician featured/priority status if plan includes those perks
+            if (!empty($plan['featured_boost'])) {
+                $db->prepare("UPDATE technicians SET is_featured = 1, featured_expire_at = ? WHERE id = ?")
+                   ->execute([$endDate . ' 23:59:59', $tid]);
+            }
+            if (!empty($plan['priority_leads'])) {
+                $db->prepare("UPDATE technicians SET priority_lead_enabled = 1 WHERE id = ?")->execute([$tid]);
+            }
+
+            $db->commit();
+            echo json_encode([
+                'status'         => 'success',
+                'message'        => "Subscription activated. ₹{$subAmount} paid.",
+                'plan'           => $plan['name'],
+                'amount'         => $subAmount,
+                'start_date'     => $startDate,
+                'end_date'       => $endDate,
+                'referrer_gets'  => $commParentTech,
+                'abd_gets'       => $commAbd,
+                'kwikar_keeps'   => $kwikarShare,
+            ]);
+        } catch (Exception $ex) {
+            $db->rollBack();
+            echo json_encode(['status' => 'error', 'message' => 'Payment failed: ' . $ex->getMessage()]);
         }
         break;
 
     default:
-        echo json_encode(["status"=>"error","message"=>"Invalid module"]);
+        echo json_encode(['status' => 'error', 'message' => 'Invalid module']);
 }
 ?>

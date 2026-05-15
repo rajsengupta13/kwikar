@@ -7,7 +7,7 @@
 return [
   'db' => [
     'host' => 'localhost',
-    'name' => 'kwikar',
+    'name' => 'kwikar_db',
     'user' => 'root',
     'pass' => '',
     'port' => 3306,

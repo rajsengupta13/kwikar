@@ -40,7 +40,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet"></noscript>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260513">
 </head>
 <body>
 
@@ -252,6 +252,7 @@
   </ul>
   <div class="nav-right">
     <a href="../technician/frontend/index.html" id="techPanelNavBtn" style="display:none;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;outline:none;padding:9px 18px;border-radius:50px;font-family:inherit;font-weight:700;font-size:.82rem;cursor:pointer;transition:all .25s;box-shadow:0 4px 14px rgba(21,128,61,.35);line-height:1;align-items:center;gap:5px;text-decoration:none;">🔧 Technician Panel</a>
+    <a href="../abd/frontend/index.html" id="abdPanelNavBtn" style="display:none;background:linear-gradient(135deg,#ff5a1f,#ff8c00);color:#fff;border:none;outline:none;padding:9px 18px;border-radius:50px;font-family:inherit;font-weight:700;font-size:.82rem;cursor:pointer;transition:all .25s;box-shadow:0 4px 14px rgba(255,90,31,.35);line-height:1;align-items:center;gap:5px;text-decoration:none;">⚡ ABD Panel</a>
     <button type="button" id="navLoginBtn" onclick="openLoginModal()">Login</button>
     <div class="nav-user-info" id="navUserInfo" style="display:none;align-items:center;gap:8px;cursor:pointer;background:#fff;border:1.5px solid rgba(13,27,62,.15);border-radius:20px;padding:4px 12px 4px 6px" onclick="openProfModal()">
       <div style="width:26px;height:26px;border-radius:50%;background:#0d1b3e;display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -277,6 +278,89 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" fill="#0d1b3e"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" fill="#0d1b3e"/></svg>
         </div>
         <div class="mtb-greet-wrap"><span class="mtb-greet-text" id="mtbGreetText"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ABD SIGNUP MODAL ══ -->
+<div class="ts-overlay" id="abdSignupOverlay" onclick="if(event.target===this)closeAbdSignup()">
+  <div class="ts-box">
+    <button type="button" class="ts-close" onclick="closeAbdSignup()">✕</button>
+    <div class="ts-progress">
+      <div class="ts-prog-dot active" id="abdp1"></div>
+      <div class="ts-prog-dot" id="abdp2"></div>
+      <div class="ts-prog-dot" id="abdp3"></div>
+      <div class="ts-prog-dot" id="abdp4"></div>
+    </div>
+
+    <!-- Step 1: Basic Info -->
+    <div class="ts-step abd-step active" id="abdStep1">
+      <div class="ts-h">ABD Registration</div>
+      <div class="ts-sub">Naam, number, email aur area daalo</div>
+      <input type="text" class="ts-input" id="abdName" placeholder="Poora Naam *" maxlength="80">
+      <input type="tel" class="ts-input" id="abdPhone" placeholder="Mobile Number *" maxlength="10" inputmode="numeric">
+      <input type="email" class="ts-input" id="abdEmail" placeholder="Email Address *">
+      <input type="text" class="ts-input" id="abdArea" placeholder="Area / City *" maxlength="100">
+      <div class="ts-err" id="abdErr1"></div>
+      <div class="ts-nav-row">
+        <button type="button" class="ts-back-btn" onclick="closeAbdSignup()">← Back</button>
+        <button type="button" class="ts-btn" onclick="abdNext(1)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Pincodes (up to 10) -->
+    <div class="ts-step abd-step" id="abdStep2">
+      <div class="ts-h">Service Pincodes</div>
+      <div class="ts-sub">Kin pincodes par kaam karenge? <strong>(Max 10)</strong></div>
+      <div class="ts-pin-row">
+        <input type="tel" class="ts-pin-input" id="abdPinInput" placeholder="6-digit Pincode" maxlength="6" inputmode="numeric" onkeydown="if(event.key==='Enter'){event.preventDefault();addAbdPin();}">
+        <button type="button" class="ts-pin-add" onclick="addAbdPin()">+ Add</button>
+      </div>
+      <div class="ts-pin-tags" id="abdPinTags"></div>
+      <div class="ts-err" id="abdErr2"></div>
+      <div class="ts-nav-row">
+        <button type="button" class="ts-back-btn" onclick="abdBack(2)">← Back</button>
+        <button type="button" class="ts-btn" onclick="abdNext(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Experience -->
+    <div class="ts-step abd-step" id="abdStep3">
+      <div class="ts-h">Management Experience</div>
+      <div class="ts-sub">Apna experience select karo</div>
+      <div class="ts-pills" id="abdExpPills">
+        <span class="ts-pill" data-val="0-1 year">0 – 1 Saal</span>
+        <span class="ts-pill" data-val="1-3 years">1 – 3 Saal</span>
+        <span class="ts-pill" data-val="3-5 years">3 – 5 Saal</span>
+        <span class="ts-pill" data-val="5+ years">5+ Saal</span>
+      </div>
+      <div class="ts-err" id="abdErr3"></div>
+      <div class="ts-nav-row">
+        <button type="button" class="ts-back-btn" onclick="abdBack(3)">← Back</button>
+        <button type="button" class="ts-btn" onclick="abdNext(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: PIN -->
+    <div class="ts-step abd-step" id="abdStep4">
+      <div class="ts-h">🔐 Login PIN Banao</div>
+      <div class="ts-sub">6-digit PIN set karo — agli baar is PIN se login karoge</div>
+      <input type="tel" class="ts-input" id="abdLoginPin" placeholder="6-digit PIN banao" maxlength="6" inputmode="numeric" autocomplete="new-password">
+      <input type="tel" class="ts-input" id="abdLoginPinConfirm" placeholder="PIN dobara daalo" maxlength="6" inputmode="numeric" autocomplete="new-password">
+      <div class="ts-err" id="abdErr4"></div>
+      <div class="ts-nav-row">
+        <button type="button" class="ts-back-btn" onclick="abdBack(4)">← Back</button>
+        <button type="button" class="ts-btn" id="abdSubmitBtn" onclick="submitAbdSignup()">Submit 🚀</button>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div class="ts-step abd-step" id="abdStepDone">
+      <div style="text-align:center;padding:24px 0">
+        <div style="font-size:3rem;margin-bottom:14px">🎉</div>
+        <div class="ts-h" style="text-align:center">ABD Registration Ho Gayi!</div>
+        <p style="font-size:.82rem;color:#64748b;margin-top:10px;line-height:1.6">Aapka ABD account activate ho gaya. Panel mein redirect ho rahe hain…</p>
       </div>
     </div>
   </div>
@@ -326,6 +410,25 @@
             <div class="lrc-text">
               <div class="lrc-label">Technician</div>
               <div class="lrc-sub">Kaam dhundhna chahta hun</div>
+            </div>
+            <div class="lrc-check">
+              <svg width="22" height="22" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+          </button>
+
+          <!-- ABD card -->
+          <button type="button" class="login-role-card" id="lrcCardAbd" onclick="selectRoleCard('abd')">
+            <div class="lrc-icon-box lrc-icon-box--abd">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
+                <path d="M12 8v4M7.5 17l4.5-5M16.5 17L12 12"/>
+              </svg>
+            </div>
+            <div class="lrc-text">
+              <div class="lrc-label">ABD <span class="lrc-role-badge">Area Director</span></div>
+              <div class="lrc-sub">Apna network manage karna hai</div>
             </div>
             <div class="lrc-check">
               <svg width="22" height="22" viewBox="0 0 20 20" fill="currentColor">
@@ -407,6 +510,9 @@
         <div class="login-error" id="regErr3"></div>
         <button type="button" class="login-btn" onclick="submitRegStep3()">✓ Register Karo</button>
       </div>
+
+      <!-- View 4: ABD placeholder — actual signup opens separate modal -->
+      <div id="abdRegView" style="display:none"></div>
 
       <!-- View 3: Technician inline reg (fallback, hidden) -->
       <div id="loginTechRegView" style="display:none">
@@ -886,7 +992,7 @@
   </div>
 </footer>
 
-<script src="script.js"></script>
+<script src="script.js?v=20260513"></script>
 
 </body>
 </html>

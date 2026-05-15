@@ -1,0 +1,2 @@
+[2026-05-10 20:16:17] [INFO] User saved | {"phone":"9534862453","with_pin":true} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=save_user
+[2026-05-10 20:16:17] [INFO] Bookings fetched | {"phone":"9534862453","count":0} | IP:::1 GET /mono-kwikar/backend/user_api.php?action=get_bookings&phone=9534862453

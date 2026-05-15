@@ -1,0 +1,8 @@
+[2026-05-13 07:39:43] [INFO] Technician saved | {"phone":"6205531392"} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-13 07:54:39] [INFO] Technician saved | {"phone":"6205531392"} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-13 12:10:14] [INFO] Pincode checked | {"pincode":"812006","available":true} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-13 12:10:52] [INFO] User registered | {"phone":"6205531392","user_id":1} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=register
+[2026-05-13 12:12:12] [INFO] Technician registered | {"phone":"6205531392","tech_id":1} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-13 12:13:56] [INFO] User registered | {"phone":"9534862453","user_id":3} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=register
+[2026-05-13 12:15:44] [INFO] Technician registered | {"phone":"6205531392","tech_id":1} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-13 12:17:30] [INFO] Technician registered | {"phone":"8862812370","tech_id":3} | IP:::1 POST /mono-kwikar/backend/booking_api.php
