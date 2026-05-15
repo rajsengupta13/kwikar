@@ -261,6 +261,10 @@ CREATE TABLE technicians (
 
     priority_lead_enabled TINYINT(1) DEFAULT 0,
 
+    -- ABD referral tracking (added during development)
+    abd_id      INT NULL COMMENT 'ABD who onboarded this technician via referral link',
+    referred_by INT NULL COMMENT 'Technician ID who referred this technician (NULL = direct ABD referral)',
+
     status ENUM(
         'active',
         'inactive',
@@ -987,3 +991,9 @@ ON technician_subscriptions(status);
 
 CREATE INDEX idx_notifications_user
 ON notifications(user_id);
+
+CREATE INDEX idx_technician_abd
+ON technicians(abd_id);
+
+CREATE INDEX idx_technician_referred_by
+ON technicians(referred_by);
