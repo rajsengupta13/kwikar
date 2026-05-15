@@ -370,12 +370,24 @@ switch ($module) {
     case 'technicians':
         $type = $_GET['type'] ?? 'direct';
 
-        // Fetch all technicians linked to this ABD
+        // Fetch all technicians linked to this ABD — JOIN users for name/phone
         $stAll = $db->prepare("
-            SELECT id, full_name, mobile, email, service_category, pincodes,
-                   experience, rating, total_reviews, is_verified,
-                   available_balance, referred_by, abd_id, created_at
-            FROM technicians WHERE abd_id = ? ORDER BY created_at ASC
+            SELECT t.id, t.user_id, t.joined_source, t.experience_years AS experience,
+                   t.rating, t.total_jobs AS total_reviews, t.kyc_status, t.availability_status,
+                   t.wallet_balance AS available_balance, t.status, t.abd_id, t.referred_by,
+                   t.is_featured, t.created_at,
+                   u.name AS full_name, u.phone AS mobile, u.email,
+                   GROUP_CONCAT(DISTINCT s.name ORDER BY s.name SEPARATOR ', ') AS service_category,
+                   GROUP_CONCAT(DISTINCT p.pincode ORDER BY p.pincode SEPARATOR ', ') AS pincodes
+            FROM   technicians t
+            JOIN   users u ON t.user_id = u.id
+            LEFT JOIN technician_services ts ON t.id = ts.technician_id
+            LEFT JOIN services s             ON ts.service_id = s.id
+            LEFT JOIN technician_pincodes tp ON t.id = tp.technician_id
+            LEFT JOIN pincodes p             ON tp.pincode_id = p.id
+            WHERE  t.abd_id = ?
+            GROUP  BY t.id, u.id
+            ORDER  BY t.created_at ASC
         ");
         $stAll->execute([$aid]);
         $allTechs = $stAll->fetchAll(PDO::FETCH_ASSOC);

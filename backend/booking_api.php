@@ -251,14 +251,14 @@ if ($action === 'save_feedback') {
 // Creates users + technicians rows, seeds pincodes/services.
 // ═══════════════════════════════════════════════════════════════
 if ($action === 'save_technician') {
-    $name  = trim($data['name']  ?? '');
-    $phone = trim($data['phone'] ?? '');
-    $email = trim($data['email'] ?? '');
-    $pin   = trim($data['pin']   ?? '');
-    $abdId = (int) ($data['abd_id'] ?? 0);
-    $exp   = trim($data['experience'] ?? '');
-    $skills = trim($data['skills'] ?? '');
-    $pincodes = trim($data['pincodes'] ?? '');
+    $name     = trim($data['name']       ?? '');
+    $phone    = trim($data['phone']      ?? '');
+    $email    = trim($data['email']      ?? '');
+    $pin      = trim($data['pin']        ?? '');
+    $abdId    = (int) ($data['abd_id']   ?? 0);
+    $exp      = (int) ($data['experience'] ?? 0);
+    $skills   = trim($data['skills']     ?? '');
+    $rawPins  = trim($data['pincodes']   ?? '');
 
     if (!$name || !$phone) {
         echo json_encode(['success' => false, 'error' => 'Name and phone required']);
@@ -267,45 +267,84 @@ if ($action === 'save_technician') {
 
     $pinHash = $pin !== '' ? password_hash($pin, PASSWORD_DEFAULT) : '';
 
-    // Use old technicians table directly (no users table FK needed)
+    // 1. Upsert into users (role = technician)
     $pdo->prepare("
-        INSERT INTO technicians (full_name, mobile, email, password, service_category, pincodes, experience)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (name, phone, email, pass_pin, role, status)
+        VALUES (?, ?, ?, ?, 'technician', 'active')
         ON DUPLICATE KEY UPDATE
-            full_name        = VALUES(full_name),
-            email            = IF(VALUES(email) != '', VALUES(email), email),
-            password         = IF(VALUES(password) != '', VALUES(password), password),
-            service_category = IF(VALUES(service_category) != '', VALUES(service_category), service_category),
-            pincodes         = IF(VALUES(pincodes) != '', VALUES(pincodes), pincodes),
-            experience       = IF(VALUES(experience) != '', VALUES(experience), experience),
-            updated_at       = NOW()
-    ")->execute([$name, $phone, $email, $pinHash, $skills, $pincodes, $exp]);
+            name     = VALUES(name),
+            email    = IF(VALUES(email) != '', VALUES(email), email),
+            pass_pin = IF(VALUES(pass_pin) != '', VALUES(pass_pin), pass_pin),
+            updated_at = NOW()
+    ")->execute([$name, $phone, $email, $pinHash]);
 
-    $st = $pdo->prepare("SELECT id FROM technicians WHERE mobile = ?");
+    $st = $pdo->prepare("SELECT id FROM users WHERE phone = ?");
     $st->execute([$phone]);
+    $userId = (int) $st->fetchColumn();
+
+    // 2. Upsert into technicians
+    $source = $abdId ? 'abd_direct' : 'website';
+    $pdo->prepare("
+        INSERT INTO technicians (user_id, joined_source, experience_years, status, abd_id)
+        VALUES (?, ?, ?, 'active', ?)
+        ON DUPLICATE KEY UPDATE
+            joined_source   = VALUES(joined_source),
+            experience_years = VALUES(experience_years),
+            abd_id          = IF(VALUES(abd_id) > 0, VALUES(abd_id), abd_id),
+            updated_at      = NOW()
+    ")->execute([$userId, $source, $exp, $abdId ?: null]);
+
+    $st = $pdo->prepare("SELECT id FROM technicians WHERE user_id = ?");
+    $st->execute([$userId]);
     $techId = (int) $st->fetchColumn();
 
-    // Save ABD referral link directly on the technician row (old schema)
-    if ($abdId && $techId) {
-        $pdo->prepare("UPDATE technicians SET abd_id = ? WHERE id = ? AND (abd_id IS NULL OR abd_id = 0)")
-            ->execute([$abdId, $techId]);
-
-        // Increment technician_count on the ABD's matching pincode
-        $pinsArr = array_filter(array_map('trim', explode(',', $pincodes)));
-        foreach ($pinsArr as $pc) {
-            $pdo->prepare("
-                UPDATE abd_pincodes SET technician_count = technician_count + 1
-                WHERE abd_id = ? AND pincode = ?
-            ")->execute([$abdId, $pc]);
+    // 3. Link services / skills
+    $skillList = array_filter(array_map('trim', explode(',', $skills)));
+    foreach ($skillList as $skill) {
+        $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $skill), '-'));
+        $pdo->prepare("INSERT IGNORE INTO services (name, slug) VALUES (?, ?)")->execute([$skill, $slug]);
+        $st = $pdo->prepare("SELECT id FROM services WHERE name = ?");
+        $st->execute([$skill]);
+        $sid = (int) $st->fetchColumn();
+        if ($sid) {
+            $pdo->prepare("INSERT IGNORE INTO technician_services (technician_id, service_id) VALUES (?, ?)")
+                ->execute([$techId, $sid]);
         }
     }
 
-    // (new-schema service/pincode tables are optional; silently skipped if not present)
-    if ($techId) {
+    // 4. Link pincodes
+    $cfg   = require __DIR__ . '/config.php';
+    $areas = $cfg['app']['service_areas'] ?? [];
+    $pinList = array_filter(array_map('trim', explode(',', $rawPins)));
+    foreach ($pinList as $pc) {
+        $pcCity = $areas[$pc] ?? 'Bhagalpur';
+        $pdo->prepare("INSERT IGNORE INTO pincodes (pincode, city, state, is_serviceable) VALUES (?, ?, 'Bihar', 1)")
+            ->execute([$pc, $pcCity]);
+        $st = $pdo->prepare("SELECT id FROM pincodes WHERE pincode = ?");
+        $st->execute([$pc]);
+        $pid = (int) $st->fetchColumn();
+        if ($pid) {
+            $pdo->prepare("INSERT IGNORE INTO technician_pincodes (technician_id, pincode_id, is_active) VALUES (?, ?, 1)")
+                ->execute([$techId, $pid]);
+        }
     }
 
-    log_info('Technician registered', ['phone' => $phone, 'tech_id' => $techId, 'abd_id' => $abdId]);
-    echo json_encode(['success' => true, 'technician_id' => $techId]);
+    // 5. Record ABD referral relationship
+    if ($abdId && $techId) {
+        // Get abds.id from user_id = abdId (abd_id field stores abds.id)
+        $pdo->prepare("
+            INSERT IGNORE INTO referral_relationships
+                (technician_id, parent_technician_id, abd_id, referral_level, relationship_type)
+            VALUES (?, NULL, ?, 1, 'direct_abd')
+        ")->execute([$techId, $abdId]);
+
+        // Create earning wallet for technician
+        $pdo->prepare("INSERT IGNORE INTO wallets (user_id, wallet_type, balance) VALUES (?, 'earning', 0.00)")
+            ->execute([$userId]);
+    }
+
+    log_info('Technician registered', ['phone' => $phone, 'user_id' => $userId, 'tech_id' => $techId, 'abd_id' => $abdId]);
+    echo json_encode(['success' => true, 'technician_id' => $techId, 'user_id' => $userId]);
     exit;
 }
 
