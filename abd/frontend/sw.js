@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kwikar-abd-v1.0.4';
+const CACHE_NAME = 'kwikar-abd-v1.1.2';
 const SHELL = [
   './index.html',
   './kwikar-data.js',
@@ -30,6 +30,8 @@ self.addEventListener('activate', event => {
           .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(client => client.navigate(client.url)))
   );
 });
 

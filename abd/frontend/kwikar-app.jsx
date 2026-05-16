@@ -233,6 +233,56 @@ function seedKDFromSession(abd) {
   };
 }
 
+// ── Logout Confirm Modal ──────────────────────────────────────────────
+function LogoutConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <>
+      <div onClick={onCancel} style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.55)', zIndex:600, backdropFilter:'blur(2px)' }}/>
+      <div style={{
+        position:'fixed', bottom:0, left:0, right:0, zIndex:601,
+        background:'#fff', borderRadius:'20px 20px 0 0',
+        padding:`28px 24px calc(32px + env(safe-area-inset-bottom,0px))`,
+        maxWidth:520, margin:'0 auto',
+        boxShadow:'0 -20px 60px rgba(15,23,42,0.2)',
+        animation:'slideUp 0.22s ease'
+      }}>
+        <div style={{ width:40, height:4, borderRadius:2, background:'#e2e8f0', margin:'0 auto 20px' }}/>
+        <div style={{ textAlign:'center', marginBottom:24 }}>
+          <div style={{
+            width:56, height:56, borderRadius:'50%', background:'rgba(239,68,68,0.1)',
+            display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px'
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </div>
+          <h3 style={{ fontSize:18, fontWeight:800, color:'#0f172a', margin:'0 0 6px' }}>Logout karna chahte ho?</h3>
+          <p style={{ fontSize:13, color:'#64748b', margin:0, lineHeight:1.55 }}>
+            Aap ABD Panel se logout ho jaoge. Wapas aane ke liye dobara login karna hoga.
+          </p>
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onCancel} style={{
+            flex:1, padding:'14px', borderRadius:14, border:'1.5px solid #e2e8f0',
+            background:'#f8fafc', cursor:'pointer', fontFamily:'inherit',
+            fontWeight:700, fontSize:14, color:'#475569'
+          }}>
+            Wapas Jao
+          </button>
+          <button onClick={onConfirm} style={{
+            flex:1, padding:'14px', borderRadius:14, border:'none',
+            background:'#ef4444', cursor:'pointer', fontFamily:'inherit',
+            fontWeight:700, fontSize:14, color:'#fff',
+            boxShadow:'0 4px 14px rgba(239,68,68,0.35)'
+          }}>
+            Haan, Logout
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────
 function App() {
   const [page, setPage] = useState("dashboard");
@@ -242,6 +292,8 @@ function App() {
   const [tweakVisible, setTweakVisible] = useState(false);
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const pageRef = React.useRef("dashboard");
 
   // Check existing session on mount — also handles autologin redirect from registration
   React.useEffect(() => {
@@ -290,6 +342,37 @@ function App() {
     window.parent.postMessage({ type:"__edit_mode_set_keys", edits:next }, "*");
   }
 
+  // ── Navigation history stack ──────────────────────────────────────────
+  // Use window globals — plain globals are always synchronous, no ref/closure timing issues
+  window._abdPage    = window._abdPage    || 'dashboard';
+  window._abdHistory = window._abdHistory || [];
+
+  // ── Back button / hardware back handling ─────────────────────────────
+  React.useEffect(() => {
+    history.pushState(null, '');
+
+    function onPop() {
+      history.pushState(null, ''); // restore guard immediately
+      if (!window.ABD_SESSION) return;
+
+      if (window._abdPage === 'dashboard') {
+        setShowLogoutConfirm(true);
+      } else {
+        const stack = window._abdHistory;
+        const prev  = stack.length > 0 ? stack[stack.length - 1] : 'dashboard';
+        window._abdHistory = stack.length > 0 ? stack.slice(0, -1) : [];
+        window._abdPage    = prev;
+        pageRef.current    = prev;
+        setPage(prev);
+        setMobileNavOpen(false);
+        setShowLogoutConfirm(false);
+      }
+    }
+
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   function handleLogin(abd) {
     setSession(abd);
     window.ABD_SESSION = abd;
@@ -301,10 +384,11 @@ function App() {
     window.ABD_SESSION = null;
     window.abdApi('logout', {}).catch(() => {});
     setSession(null);
+    setShowLogoutConfirm(false);
   }
 
   const PAGE_MAP = {
-    "dashboard":             () => <DashboardPage onNavigate={setPage}/>,
+    "dashboard":             () => <DashboardPage onNavigate={navigate}/>,
     "direct-technicians":    () => <DirectTechniciansPage/>,
     "referral-technicians":  () => <ReferralTechniciansPage/>,
     "auto-joined":           () => <AutoJoinedPage/>,
@@ -323,6 +407,14 @@ function App() {
   const PageComponent = PAGE_MAP[page] || (() => <ComingSoon page={page}/>);
 
   function navigate(nextPage) {
+    if (nextPage === window._abdPage) return; // already here
+    if (nextPage === 'dashboard') {
+      window._abdHistory = [];
+    } else {
+      window._abdHistory = [...window._abdHistory, window._abdPage];
+    }
+    window._abdPage = nextPage;
+    pageRef.current  = nextPage;
     setPage(nextPage);
     setMobileNavOpen(false);
   }
@@ -344,6 +436,12 @@ function App() {
         </div>
       </div>
       <MobileBottomNav activePage={page} onNavigate={navigate}/>
+      {showLogoutConfirm && (
+        <LogoutConfirmModal
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
 
       {tweakVisible && (
         <TweaksPanel onClose={()=>{setTweakVisible(false); window.parent.postMessage({type:"__edit_mode_dismissed"},"*");}}>
