@@ -72,7 +72,7 @@ function getMaxDepth(node, expanded, depth = 0) {
   return Math.max(...node.children.map(c => getMaxDepth(c, expanded, depth + 1)));
 }
 
-function TreeNode({ node, onToggle, hoveredId, onHover }) {
+function TreeNode({ node, onToggle, hoveredId, onHover, networkTotal }) {
   const lc = LEVEL_COLORS[Math.min(node.depth, 4)] || LEVEL_COLORS[4];
   const isHovered = hoveredId === node.id;
   const isABD = node.depth === 0;
@@ -169,7 +169,7 @@ function TreeNode({ node, onToggle, hoveredId, onHover }) {
         {isABD && (
           <div style={{ textAlign:"right" }}>
             <div style={{ fontSize:9, fontWeight:600, color:"rgba(255,255,255,0.6)", textTransform:"uppercase", letterSpacing:"0.04em" }}>Network</div>
-            <div style={{ fontSize:12, fontWeight:800, color:"#fff" }}>47 Techs</div>
+            <div style={{ fontSize:12, fontWeight:800, color:"#fff" }}>{networkTotal} Tech{networkTotal !== 1 ? 's' : ''}</div>
           </div>
         )}
       </div>
@@ -261,6 +261,22 @@ function ReferralTree({ data }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [zoom, setZoom] = useState(1);
 
+  // Compute real counts from live tree data
+  const networkStats = useMemo(() => {
+    function countAll(node) {
+      return 1 + (node.children || []).reduce((s, c) => s + countAll(c), 0);
+    }
+    function maxDepth(node, d) {
+      if (!(node.children?.length)) return d;
+      return Math.max(...node.children.map(c => maxDepth(c, d + 1)));
+    }
+    const direct   = (data.children || []).length;
+    const total    = countAll(data) - 1; // exclude ABD root
+    const indirect = total - direct;
+    const depth    = total > 0 ? maxDepth(data, 0) : 0;
+    return { total, direct, indirect, depth };
+  }, [data]);
+
   const toggleNode = useCallback((id) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -337,17 +353,17 @@ function ReferralTree({ data }) {
             })}
           </svg>
           {nodes.map(node => (
-            <TreeNode key={node.id} node={node} onToggle={toggleNode} hoveredId={hoveredId} onHover={setHoveredId}/>
+            <TreeNode key={node.id} node={node} onToggle={toggleNode} hoveredId={hoveredId} onHover={setHoveredId} networkTotal={networkStats.total}/>
           ))}
         </div>
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginTop:16 }}>
         {[
-          { label:"Total Technicians", value:"47", color:"#ff5a1f" },
-          { label:"Direct (L1)",       value:"12", color:"#ff5a1f" },
-          { label:"Indirect (L2+)",    value:"35", color:"#3b82f6" },
-          { label:"Network Depth",     value:"3 Levels", color:"#8b5cf6" },
+          { label:"Total Technicians", value: String(networkStats.total),    color:"#ff5a1f" },
+          { label:"Direct (L1)",       value: String(networkStats.direct),   color:"#ff5a1f" },
+          { label:"Indirect (L2+)",    value: String(networkStats.indirect), color:"#3b82f6" },
+          { label:"Network Depth",     value: networkStats.depth > 0 ? `${networkStats.depth} Level${networkStats.depth !== 1 ? 's' : ''}` : "—", color:"#8b5cf6" },
         ].map(s => (
           <div key={s.label} style={{
             background:"#fff", borderRadius:12, padding:"14px 18px",
