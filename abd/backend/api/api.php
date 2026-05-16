@@ -433,7 +433,7 @@ switch ($module) {
             ]);
 
         } elseif ($type === 'auto') {
-            $pending = array_values(array_filter($allTechs, fn($t) => !$t['is_verified']));
+            $pending = array_values(array_filter($allTechs, fn($t) => ($t['kyc_status'] ?? '') !== 'verified'));
             echo json_encode(['status' => 'success', 'technicians' => $pending]);
 
         } else {
@@ -454,9 +454,9 @@ switch ($module) {
                     'experience_years'    =>         $t['experience'],
                     'rating'              => (float) $t['rating'],
                     'total_jobs'          => (int)   $t['total_reviews'],
-                    'kyc_status'          =>         $t['is_verified'] ? 'verified' : 'pending',
-                    'availability_status' =>         'offline',
-                    'status'              =>         'active',
+                    'kyc_status'          =>         ($t['kyc_status'] ?? '') === 'verified' ? 'verified' : 'pending',
+                    'availability_status' =>         $t['availability_status'] ?? 'offline',
+                    'status'              =>         $t['status'] ?? 'active',
                     'commission_earned'   =>         0,
                     'referral_count'      => (int)   $refCount,
                     'created_at'          =>         $t['created_at'],

@@ -392,6 +392,8 @@ section{padding:80px 5%}
 .ts-pin-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .ts-pin-tag{display:flex;align-items:center;gap:5px;background:#dce8ff;color:#0d1b3e;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
 .ts-pin-tag button{background:none;border:none;cursor:pointer;color:#0d1b3e;font-size:.7rem;padding:0;line-height:1}
+.abd-pin-pill{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;font-family:inherit;font-size:.75rem;font-weight:700;color:#0f172a;cursor:pointer;transition:all .18s;margin:0 6px 6px 0;white-space:nowrap}
+.abd-pin-pill:hover{border-color:#0f172a;background:#f1f5f9}
 .ts-upload-area{border:2px dashed #e2e8f0;border-radius:16px;padding:32px 20px;text-align:center;cursor:pointer;transition:border .2s;margin-bottom:14px}
 .ts-upload-area:hover{border-color:#1d4ed8}
 .ts-upload-icon{font-size:2.5rem;margin-bottom:8px}

@@ -283,6 +283,10 @@ function LogoutConfirmModal({ onConfirm, onCancel }) {
   );
 }
 
+// ── Nav tracking — file-level so React re-renders never reset them ────
+let _navPage  = 'dashboard';
+let _navStack = [];
+
 // ── Main App ──────────────────────────────────────────────────────────
 function App() {
   const [page, setPage] = useState("dashboard");
@@ -342,27 +346,22 @@ function App() {
     window.parent.postMessage({ type:"__edit_mode_set_keys", edits:next }, "*");
   }
 
-  // ── Navigation history stack ──────────────────────────────────────────
-  // Use window globals — plain globals are always synchronous, no ref/closure timing issues
-  window._abdPage    = window._abdPage    || 'dashboard';
-  window._abdHistory = window._abdHistory || [];
-
   // ── Back button / hardware back handling ─────────────────────────────
   React.useEffect(() => {
-    history.pushState(null, '');
+    history.replaceState({ _abd: true }, '');
+    history.pushState({ _abd: true }, '');
 
     function onPop() {
-      history.pushState(null, ''); // restore guard immediately
+      history.pushState({ _abd: true }, '');
       if (!window.ABD_SESSION) return;
 
-      if (window._abdPage === 'dashboard') {
+      if (_navPage === 'dashboard') {
         setShowLogoutConfirm(true);
       } else {
-        const stack = window._abdHistory;
-        const prev  = stack.length > 0 ? stack[stack.length - 1] : 'dashboard';
-        window._abdHistory = stack.length > 0 ? stack.slice(0, -1) : [];
-        window._abdPage    = prev;
-        pageRef.current    = prev;
+        const prev = _navStack.length > 0 ? _navStack[_navStack.length - 1] : 'dashboard';
+        _navStack  = _navStack.length > 0 ? _navStack.slice(0, -1) : [];
+        _navPage   = prev;
+        pageRef.current = prev;
         setPage(prev);
         setMobileNavOpen(false);
         setShowLogoutConfirm(false);
@@ -407,14 +406,14 @@ function App() {
   const PageComponent = PAGE_MAP[page] || (() => <ComingSoon page={page}/>);
 
   function navigate(nextPage) {
-    if (nextPage === window._abdPage) return; // already here
+    if (nextPage === _navPage) return;
     if (nextPage === 'dashboard') {
-      window._abdHistory = [];
+      _navStack = [];
     } else {
-      window._abdHistory = [...window._abdHistory, window._abdPage];
+      _navStack = [..._navStack, _navPage];
     }
-    window._abdPage = nextPage;
-    pageRef.current  = nextPage;
+    _navPage        = nextPage;
+    pageRef.current = nextPage;
     setPage(nextPage);
     setMobileNavOpen(false);
   }

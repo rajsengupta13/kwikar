@@ -1028,6 +1028,8 @@ function openTechSignup(){
   document.getElementById('tsPhotoPreview').style.display='none';
   document.getElementById('tsUploadPlaceholder').style.display='';
   ['tsName','tsPhone','tsEmail','tsPinInput','tsPin','tsPinConfirm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  // Re-render ABD pincode pills if referral pincodes were fetched
+  renderAbdPincodePills();
   showTsStep(1);
   document.getElementById('tsOverlay').classList.add('show');
 }
@@ -1583,6 +1585,21 @@ function showPinSetupPrompt(phone, userId){
   // Store the ABD ID so submitTechSignup() can include it
   sessionStorage.setItem('kwikar_abd_ref', abdRef);
 
+  // Fetch ABD's pincodes and store them for step 3
+  fetch('/mono-kwikar/backend/booking_api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get_abd_pincodes', abd_id: abdRef })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success && data.pincodes && data.pincodes.length) {
+      window._abdRefPincodes = data.pincodes; // [{pincode, city}, ...]
+      renderAbdPincodePills();
+    }
+  })
+  .catch(() => {});
+
   // Auto-open technician signup form once the page is interactive
   function tryOpen() {
     if (typeof openTechSignup === 'function') {
@@ -1595,6 +1612,30 @@ function showPinSetupPrompt(phone, userId){
     setTimeout(tryOpen, 600);
   }
 })();
+
+function renderAbdPincodePills() {
+  const container = document.getElementById('abdRefPincodes');
+  if (!container || !window._abdRefPincodes || !window._abdRefPincodes.length) return;
+  container.innerHTML =
+    '<div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px;">ABD ke service areas — tap karke select karo:</div>' +
+    window._abdRefPincodes.map(pc =>
+      `<button type="button" class="abd-pin-pill" onclick="selectAbdPin('${pc.pincode}')" id="abdpill_${pc.pincode}">
+        📍 ${pc.pincode}${pc.city ? ' · ' + pc.city : ''}
+      </button>`
+    ).join('');
+  container.style.display = 'block';
+}
+
+function selectAbdPin(pin) {
+  if (tsPins.includes(pin)) return; // already added
+  if (tsPins.length >= 4) { document.getElementById('tsErr3').textContent = 'Maximum 4 pincodes allowed'; return; }
+  tsPins.push(pin);
+  renderTsPins();
+  // Highlight pill as selected
+  const pill = document.getElementById('abdpill_' + pin);
+  if (pill) { pill.style.background = '#0f172a'; pill.style.color = '#fff'; }
+  document.getElementById('tsErr3').textContent = '';
+}
 
 document.getElementById('bkDoneBtn').addEventListener('click',closeBookingModal);
 
