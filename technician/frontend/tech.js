@@ -39,7 +39,7 @@
       try { avatar = last.avatar || localStorage.getItem('kwikar_tech_avatar_' + last.phone) || ''; } catch(_) {}
       window._autoLoginParams = { name: last.name||'Technician', phone: last.phone, email: last.email||'', role: last.role||'Technician', avatar };
     } else {
-      window.location.replace('/mono-kwikar/frontend/index.html');
+      window.location.replace(window.location.pathname.replace(/\/technician\/.*$/, '') + '/frontend/index.html');
     }
   }
 })();
@@ -73,6 +73,19 @@ const API = '../backend/api/api.php';
 let currentSection = 'dashboard';
 let currentJobTab  = 'new';
 let chartsReady    = {};
+
+// ── Back button — stay inside the panel ───────────────────
+(function(){
+  history.pushState(null, '');
+  window.addEventListener('popstate', function() {
+    history.pushState(null, '');
+    if (currentSection === 'dashboard') {
+      logout();
+    } else {
+      navigate('dashboard');
+    }
+  });
+})();
 
 // ── Navigation ────────────────────────────────────────────
 function navigate(sec, jobTab) {
@@ -695,6 +708,6 @@ function logout() {
   if (confirm('Logout from Kwikar?')) {
     try { fetch(API+'?module=logout', {method:'POST'}); } catch(_) {}
     localStorage.removeItem('kwikar_tech_lastlogin');
-    window.location.replace('/mono-kwikar/frontend/index.html');
+    window.location.replace(window.location.pathname.replace(/\/technician\/.*$/, '') + '/frontend/index.html');
   }
 }

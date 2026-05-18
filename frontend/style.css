@@ -392,8 +392,68 @@ section{padding:80px 5%}
 .ts-pin-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
 .ts-pin-tag{display:flex;align-items:center;gap:5px;background:#dce8ff;color:#0d1b3e;border-radius:20px;padding:4px 10px;font-size:.75rem;font-weight:700}
 .ts-pin-tag button{background:none;border:none;cursor:pointer;color:#0d1b3e;font-size:.7rem;padding:0;line-height:1}
-.abd-pin-pill{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;border:1.5px solid #cbd5e1;background:#fff;font-family:inherit;font-size:.75rem;font-weight:700;color:#0f172a;cursor:pointer;transition:all .18s;margin:0 6px 6px 0;white-space:nowrap}
-.abd-pin-pill:hover{border-color:#0f172a;background:#f1f5f9}
+/* ══ ABD REFERRAL OVERLAYS ══ */
+.abdr-overlay{position:fixed;inset:0;z-index:950;background:rgba(6,14,32,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px}
+.abdr-overlay[style*="flex"]{animation:fadeIn .25s ease}
+.abdr-panel{background:#fff;border-radius:24px;width:100%;max-width:400px;padding:28px 22px 24px;text-align:center;box-shadow:0 32px 80px rgba(6,14,32,.45);animation:popUp .35s cubic-bezier(.2,.8,.2,1) both;max-height:90vh;overflow-y:auto}
+.abdr-logo{font-size:1.5rem;font-weight:800;color:#0d1b3e;letter-spacing:-.5px;margin-bottom:14px}
+.abdr-logo em{color:#1d4ed8;font-style:normal}
+.abdr-title{font-size:1.15rem;font-weight:800;color:#0d1b3e;margin-bottom:5px;letter-spacing:-.3px}
+.abdr-sub{font-size:.78rem;color:#64748b;margin-bottom:20px;line-height:1.55}
+.abdr-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;text-align:left}
+.abdr-card{display:flex;align-items:center;gap:14px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:16px;padding:15px 16px;cursor:pointer;font-family:inherit;transition:all .22s cubic-bezier(.4,0,.2,1);width:100%;-webkit-tap-highlight-color:transparent}
+.abdr-card:active{transform:scale(.98)}
+.abdr-card:hover{border-color:#0d1b3e;background:#fff;box-shadow:0 8px 24px rgba(13,27,62,.12);transform:translateY(-2px)}
+.abdr-card-icon{font-size:1.6rem;flex-shrink:0;line-height:1}
+.abdr-card-body{flex:1;text-align:left}
+.abdr-card-label{font-size:.92rem;font-weight:800;color:#0d1b3e;margin-bottom:2px}
+.abdr-card-desc{font-size:.72rem;color:#64748b;line-height:1.4}
+.abdr-card-arrow{font-size:.9rem;color:#94a3b8;flex-shrink:0}
+.abdr-note{font-size:.68rem;color:#94a3b8;margin-top:4px}
+.abdr-back{background:none;border:none;color:#64748b;font-family:inherit;font-size:.78rem;font-weight:600;cursor:pointer;padding:0 0 12px;display:block;text-align:left}
+.abdr-back:hover{color:#0d1b3e}
+.abdr-input{width:100%;height:48px;border:1.5px solid #e2e8f0;border-radius:12px;padding:0 14px;font-family:inherit;font-size:.88rem;color:#0d1b3e;background:#f8fafc;outline:none;margin-bottom:10px;transition:border .2s;display:block}
+.abdr-input:focus{border-color:#1d4ed8;background:#fff}
+.abdr-err{font-size:.74rem;color:#ef4444;font-weight:600;min-height:16px;margin-bottom:8px}
+.abdr-btn{width:100%;height:50px;background:linear-gradient(135deg,#0d1b3e,#1d4ed8);color:#fff;border:none;border-radius:13px;font-family:inherit;font-size:.94rem;font-weight:800;cursor:pointer;box-shadow:0 6px 20px rgba(29,78,216,.3);transition:all .2s;margin-top:4px}
+.abdr-btn:hover{transform:translateY(-1px);box-shadow:0 10px 28px rgba(29,78,216,.4)}
+.abdr-btn:disabled{opacity:.6;cursor:wait;transform:none}
+/* Success panel */
+.abdr-success-panel{padding:36px 24px 28px}
+.abdr-success-icon{font-size:3.5rem;margin-bottom:16px;animation:wbob .5s cubic-bezier(.2,1.5,.4,1) both}
+.abdr-success-title{font-size:1.25rem;font-weight:800;color:#0d1b3e;margin-bottom:12px;letter-spacing:-.3px}
+.abdr-success-msg{font-size:.84rem;color:#475569;line-height:1.7;margin-bottom:20px}
+/* Mobile */
+@media(max-width:640px){
+  .abdr-panel{padding:22px 16px 20px;border-radius:20px}
+  .abdr-title{font-size:1rem}
+  .abdr-sub{font-size:.72rem;margin-bottom:16px}
+  .abdr-card{padding:13px 14px;gap:12px;border-radius:14px}
+  .abdr-card-icon{font-size:1.4rem}
+  .abdr-card-label{font-size:.85rem}
+  .abdr-card-desc{font-size:.68rem}
+  .abdr-input{height:44px;font-size:.84rem;border-radius:10px}
+  .abdr-btn{height:46px;font-size:.88rem}
+  .abdr-success-icon{font-size:2.8rem}
+  .abdr-success-title{font-size:1.1rem}
+  .abdr-success-msg{font-size:.78rem}
+}
+
+/* ABD referral pincode area — step 3 of technician signup */
+#abdRefPincodes{margin-top:12px;padding:10px 12px;background:#f0f6ff;border-radius:12px;border:1.5px solid #dce8ff}
+.abd-ref-label{font-size:.72rem;color:#475569;font-weight:700;margin-bottom:8px;line-height:1.4}
+.abd-ref-pills{display:flex;flex-wrap:wrap;gap:6px}
+.abd-pin-pill{display:inline-flex;align-items:center;gap:3px;padding:8px 13px;border-radius:20px;border:1.5px solid #1d4ed8;background:#fff;font-family:inherit;font-size:.78rem;font-weight:700;color:#0d1b3e;cursor:pointer;transition:all .18s;white-space:nowrap;line-height:1;-webkit-tap-highlight-color:transparent;min-height:36px}
+.abd-pill-city{font-weight:500;color:#475569}
+.abd-pin-pill:active{transform:scale(.95)}
+.abd-pin-pill.selected{background:#0d1b3e;border-color:#0d1b3e;color:#fff}
+.abd-pin-pill.selected .abd-pill-city{color:rgba(255,255,255,.7)}
+@media(max-width:640px){
+  #abdRefPincodes{margin-top:10px;padding:10px}
+  .abd-ref-label{font-size:.68rem;margin-bottom:7px}
+  .abd-ref-pills{gap:6px}
+  .abd-pin-pill{padding:9px 13px;font-size:.76rem;min-height:38px;border-radius:20px}
+}
 .ts-upload-area{border:2px dashed #e2e8f0;border-radius:16px;padding:32px 20px;text-align:center;cursor:pointer;transition:border .2s;margin-bottom:14px}
 .ts-upload-area:hover{border-color:#1d4ed8}
 .ts-upload-icon{font-size:2.5rem;margin-bottom:8px}

@@ -40,7 +40,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet"></noscript>
 
-<link rel="stylesheet" href="style.css?v=20260513">
+<link rel="stylesheet" href="style.css?v=20260517">
 </head>
 <body>
 
@@ -54,6 +54,56 @@
   <div class="pwa-bar-btns">
     <button class="pba-install" id="pwa-install-btn">Install</button>
     <button class="pba-close" id="pwa-dismiss-btn">✕</button>
+  </div>
+</div>
+
+<!-- ══ ABD REFERRAL — Role Choice ══ -->
+<div class="abdr-overlay" id="abdRefChoiceOverlay" style="display:none">
+  <div class="login-box" style="max-width:380px">
+    <div class="login-header">
+      <div class="login-header-logo">K<em>wikar</em></div>
+      <div class="login-header-sub">YOU'VE BEEN INVITED</div>
+    </div>
+    <div class="login-body">
+      <div class="login-title">Pehle batao ki aap kaise use karenge Kwikar</div>
+      <div style="height:14px"></div>
+      <div class="login-role-cards">
+        <button type="button" class="login-role-card" onclick="abdChooseRole('customer')">
+          <div class="lrc-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          </div>
+          <div class="lrc-text">
+            <div class="lrc-label">Customer</div>
+            <div class="lrc-sub">Service book karna chahta hun</div>
+          </div>
+          <svg class="lrc-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <button type="button" class="login-role-card" onclick="abdChooseRole('tech')">
+          <div class="lrc-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+          </div>
+          <div class="lrc-text">
+            <div class="lrc-label">Technician</div>
+            <div class="lrc-sub">Kaam dhundhna chahta hun</div>
+          </div>
+          <svg class="lrc-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Registration Success Popup (shown after any registration) ══ -->
+<div class="abdr-overlay" id="abdRegSuccessOverlay" style="display:none;z-index:9999">
+  <div class="abdr-panel abdr-success-panel">
+    <div class="abdr-success-icon">🎉</div>
+    <div class="abdr-success-title">Registration Successful!</div>
+    <div class="abdr-success-msg">
+      Aap <strong>Kwikar Family</strong> ka hissa ban gaye — Welcome! 🙌<br><br>
+      Hum <strong>26 May 2026</strong> ko launch kar rahe hain. Jab aapke area mein service available hogi, aapko <strong>sabse pehle notify</strong> karenge!
+    </div>
+    <button type="button" class="abdr-btn" onclick="abdRegSuccessClose()">Site par Jaao →</button>
+    <p class="abdr-note" style="margin-top:12px">Kwikar — India ka bharosemand home repair platform</p>
   </div>
 </div>
 
@@ -167,10 +217,10 @@
         <input type="tel" class="ts-pin-input" id="tsPinInput" placeholder="6-digit Pincode" maxlength="6" inputmode="numeric" onkeydown="if(event.key==='Enter')addTsPin()">
         <button type="button" class="ts-pin-add" onclick="addTsPin()">+ Add</button>
       </div>
-      <div class="ts-pin-tags" id="tsPinTags"></div>
-      <div class="ts-err" id="tsErr3"></div>
+      <div class="ts-pin-tags" id="tsPinTags" style="margin-bottom:4px"></div>
+      <div class="ts-err" id="tsErr3" style="margin-bottom:10px"></div>
       <!-- ABD referral pincodes — only shown when technician comes via ABD link/QR -->
-      <div id="abdRefPincodes" style="display:none;margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;"></div>
+      <div id="abdRefPincodes" style="display:none;padding:12px 14px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:14px"></div>
       <div class="ts-nav-row">
         <button type="button" class="ts-back-btn" onclick="tsBack(3)">← Back</button>
         <button type="button" class="ts-btn" onclick="tsNext(3)">Continue →</button>
@@ -220,9 +270,9 @@
     <div class="ts-step" id="tsStepDone">
       <div style="text-align:center;padding:20px 0">
         <div style="font-size:3rem;margin-bottom:12px">🎉</div>
-        <div class="ts-h" style="text-align:center">Application Submit Ho Gayi!</div>
-        <p style="font-size:.82rem;color:#64748b;margin-top:8px;line-height:1.6">Hamari team 48 ghante mein aapka profile review karke contact karegi. Kwikar family mein welcome!</p>
-        <button type="button" class="ts-btn" style="margin-top:20px" onclick="closeTechSignup()">Theek Hai ✓</button>
+        <div class="ts-h" style="text-align:center">Application Submitted!</div>
+        <p style="font-size:.82rem;color:#64748b;margin-top:8px;line-height:1.6">Our team will review your profile within 48 hours and get in touch. Welcome to the Kwikar family!</p>
+        <button type="button" class="ts-btn" style="margin-top:20px" onclick="closeTechSignup();showAbdRegSuccess()">Got it ✓</button>
       </div>
     </div>
   </div>
@@ -713,7 +763,7 @@
     <!-- 1. AC -->
     <div class="svc-card-new reveal" onclick="bookService('ac')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/17a584e4b-6224-4818-abb0-bffc1b5a0991.png" alt="AC Repair" loading="lazy">
+        <img src="images/ac-repair.png" alt="AC Repair" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">AC Repair</div>
@@ -723,7 +773,7 @@
     <!-- 2. Refrigerator -->
     <div class="svc-card-new reveal" onclick="bookService('fridge')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1428e2381-2d29-4a10-9479-988bf2c62fde.png" alt="Refrigerator" loading="lazy">
+        <img src="images/fridge-repair.png" alt="Refrigerator" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">Refrigerator</div>
@@ -733,7 +783,7 @@
     <!-- 3. Washing Machine -->
     <div class="svc-card-new reveal" onclick="bookService('washing')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1cf6d8693-f778-4992-b5b7-fd667000bfd4.png" alt="Washing Machine" loading="lazy">
+        <img src="images/wm-repair.png" alt="Washing Machine" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">Washing Machine</div>
@@ -743,7 +793,7 @@
     <!-- 4. TV -->
     <div class="svc-card-new reveal" onclick="bookService('tv')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1fe1b2539-b2c5-4372-9c86-f2ac2c7a5bac.png" alt="TV Repair" loading="lazy">
+        <img src="images/tv-repair.png" alt="TV Repair" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">Television</div>
@@ -753,7 +803,7 @@
     <!-- 5. RO -->
     <div class="svc-card-new reveal" onclick="bookService('ro')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1307feaba-a78b-4cf0-ad09-5ef0e5e8f0b4.png" alt="RO Purifier" loading="lazy">
+        <img src="images/ro-repair.png" alt="RO Purifier" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">RO Purifier</div>
@@ -763,7 +813,7 @@
     <!-- 6. Geyser -->
     <div class="svc-card-new reveal" onclick="bookService('geyser')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/101150c48-08ec-42cb-bb9b-428988ab1f9a.png" alt="Geyser" loading="lazy">
+        <img src="images/geyser-repair.png" alt="Geyser" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">Geyser</div>
@@ -773,7 +823,7 @@
     <!-- 7. Microwave -->
     <div class="svc-card-new reveal" onclick="bookService('microwave')">
       <div class="svc-img-new">
-        <img src="https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1961ad9f4-64bd-4c25-949e-f2aca885ceb1.png" alt="Microwave" loading="lazy">
+        <img src="images/microwave-repair.png" alt="Microwave" loading="lazy">
       </div>
       <div class="svc-body-new">
         <div class="svc-name-new">Microwave</div>
@@ -834,13 +884,13 @@
     <p class="sec-p">Sabhi major home appliances ki professional repair. Same-day service, transparent pricing, 30-day warranty.</p>
   </div>
   <div class="services-grid">
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=500&q=80&auto=format&fit=crop" alt="AC" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">AC Repair</div><div class="svc-price"></div></div><div class="svc-tag">Sabse Popular</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?w=500&q=80&auto=format&fit=crop" alt="Refrigerator" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Refrigerator</div><div class="svc-price"></div></div><div class="svc-tag">Quick Fix</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=500&q=80&auto=format&fit=crop" alt="Washing Machine" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Washing Machine</div><div class="svc-price"></div></div><div class="svc-tag">Usi Din</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=500&q=80&auto=format&fit=crop" alt="TV" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Television</div><div class="svc-price"></div></div><div class="svc-tag">LED/OLED</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&q=80&auto=format&fit=crop" alt="RO" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">RO Water Purifier</div><div class="svc-price"></div></div><div class="svc-tag">Service+Filter</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=500&q=80&auto=format&fit=crop" alt="Geyser" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Geyser Repair</div><div class="svc-price"></div></div><div class="svc-tag">Sabhi Brands</div></div></div>
-    <div class="svc-card reveal"><div class="svc-img"><img src="https://upload.wikimedia.org/wikipedia/commons/e/e2/Silver_GE_Microwave.jpg" alt="Microwave" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Microwave Oven</div><div class="svc-price"></div></div><div class="svc-tag">Convection+Solo</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance1.jpeg" alt="AC" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">AC Repair</div><div class="svc-price"></div></div><div class="svc-tag">Sabse Popular</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance2.jpeg" alt="Refrigerator" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Refrigerator</div><div class="svc-price"></div></div><div class="svc-tag">Quick Fix</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance3.jpeg" alt="Washing Machine" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Washing Machine</div><div class="svc-price"></div></div><div class="svc-tag">Usi Din</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance4.jpeg" alt="TV" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Television</div><div class="svc-price"></div></div><div class="svc-tag">LED/OLED</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance5.jpeg" alt="RO" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">RO Water Purifier</div><div class="svc-price"></div></div><div class="svc-tag">Service+Filter</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance6.jpeg" alt="Geyser" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Geyser Repair</div><div class="svc-price"></div></div><div class="svc-tag">Sabhi Brands</div></div></div>
+    <div class="svc-card reveal"><div class="svc-img"><img src="images/appliance7.jpeg" alt="Microwave" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Microwave Oven</div><div class="svc-price"></div></div><div class="svc-tag">Convection+Solo</div></div></div>
      <div class="svc-card reveal"><div class="svc-img"><img src="https://png.pngtree.com/png-vector/20220725/ourmid/pngtree-3d-kitchen-appliances-appliance-household-png-image_6055001.png" alt="Microwave" loading="lazy"><div class="svc-img-overlay"></div></div><div class="svc-body"><div><div class="svc-name">Many more</div><div class="svc-price"></div></div><div class="svc-tag">Convection+Solo</div></div></div>
    
 </section>

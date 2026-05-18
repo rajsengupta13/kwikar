@@ -1,3 +1,6 @@
+// Dynamic base path — works on both localhost (/mono-kwikar) and live root (/)
+const _BASE = window.location.pathname.replace(/\/frontend\/.*$/, '');
+
 /* ══════════ WELCOME MODAL ══════════ */
 (function(){
   const modal       = document.getElementById('welcomeModal');
@@ -56,7 +59,7 @@
       const pinIn=document.getElementById('pinIn');
       if(pinIn)pinIn.value=pin;
       // Save anonymous pincode visit to DB (tracks area demand before auth)
-      fetch('/mono-kwikar/backend/booking_api.php',{
+      fetch(_BASE+'/backend/booking_api.php',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'check_pincode',pincode:pin})
       }).catch(()=>{});
@@ -361,7 +364,7 @@ async function cancelBooking(id){
   const btn=document.getElementById('bkCancelBtn');
   if(btn){btn.disabled=true;btn.textContent='Cancelling...';}
   try{
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=cancel_booking',{
+    const res=await fetch(_BASE+'/backend/user_api.php?action=cancel_booking',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:id,phone:u.phone})
@@ -386,7 +389,7 @@ async function loadBookings(){
   if(!u.phone){list.innerHTML='<div class="bookings-empty">Pehle login karo</div>';return;}
   list.innerHTML='<div class="bookings-empty">Loading...</div>';
   try{
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(u.phone));
+    const res=await fetch(_BASE+'/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(u.phone));
     const json=await res.json();
     if(!json.success||!json.bookings.length){list.innerHTML='<div class="bookings-empty">Abhi tak koi booking nahi 😊<br>Pehli booking karo!</div>';return;}
     // Update badge
@@ -423,7 +426,7 @@ async function refreshBookingBadge(){
   if(!u)return;
   try{
     const p=JSON.parse(u).phone;
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(p));
+    const res=await fetch(_BASE+'/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(p));
     const json=await res.json();
     if(json.success)updateBookingBadge(json.bookings.length);
   }catch(e){}
@@ -575,7 +578,7 @@ async function submitLoginPin(){
   btn.textContent='Verifying…';
   try{
     if(isAbd){
-      const res=await fetch('/mono-kwikar/abd/backend/api/api.php?module=login',{
+      const res=await fetch(_BASE+'/abd/backend/api/api.php?module=login',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({phone,pin})
       });
@@ -588,7 +591,7 @@ async function submitLoginPin(){
       return;
     }
     const action=isTech?'verify_tech_pin':'login';
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action='+action,{
+    const res=await fetch(_BASE+'/backend/user_api.php?action='+action,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({phone,pin})
     });
@@ -661,7 +664,7 @@ async function submitRegStep3(){
   localStorage.setItem('kwikar_user',JSON.stringify(userData));
   localStorage.setItem('kwikar_pin_done','1');
   try{
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=register',{
+    const res=await fetch(_BASE+'/backend/user_api.php?action=register',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...userData,pin})
     });
@@ -672,6 +675,7 @@ async function submitRegStep3(){
   }catch(e){err.textContent='Server error — dobara try karo';return;}
   localStorage.setItem('kwikar_user',JSON.stringify(userData));
   applyLogin(name,'user');closeLoginModal();refreshBookingBadge();
+  showAbdRegSuccess();
 }
 
 async function submitTechReg(){
@@ -696,16 +700,12 @@ async function submitTechReg(){
   registry[norm]=techData;
   localStorage.setItem('kwikar_tech_registry',JSON.stringify(registry));
   // Save to DB
-  try{await fetch('/mono-kwikar/backend/booking_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save_technician',name,phone:norm,email,skills:skills.join(', '),experience:exp,pincodes:pin})});}catch(_){}
-  err.style.color='#22c55e';
-  err.textContent='✅ Register ho gaya! Technician panel mein ja rahe hain…';
-  setTimeout(()=>{
-    closeLoginModal();
-    redirectToTechPanel(name, techData.phone||norm, techData.email||'', techData.skills||'');
-  },1400);
+  try{await fetch(_BASE+'/backend/booking_api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save_technician',name,phone:norm,email,skills:skills.join(', '),experience:exp,pincodes:pin})});}catch(_){}
+  closeLoginModal();
+  showAbdRegSuccess();
 }
 function redirectToAbdPanel(name, phone){
-  const base='/mono-kwikar/abd/frontend/index.html';
+  const base=_BASE+'/abd/frontend/index.html';
   const p=new URLSearchParams({autologin:'1',name:name||'',phone:phone||''});
   setTimeout(()=>{ window.location.href=base+'?'+p.toString(); },400);
 }
@@ -821,7 +821,7 @@ async function submitAbdSignup(){
   const email=document.getElementById('abdEmail').value.trim();
   const area=document.getElementById('abdArea').value.trim();
   try{
-    const res=await fetch('/mono-kwikar/abd/backend/api/api.php?module=register',{
+    const res=await fetch(_BASE+'/abd/backend/api/api.php?module=register',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name,phone,email,area,pincodes:_abdPins,experience:_abdExp,pin})
     });
@@ -837,7 +837,7 @@ async function submitAbdSignup(){
 }
 
 function redirectToTechPanel(name, phone, email, role){
-  const base='/mono-kwikar/technician/frontend/index.html';
+  const base=_BASE+'/technician/frontend/index.html';
   const p=new URLSearchParams({
     autologin:'1',
     name:name||'',
@@ -1121,9 +1121,12 @@ async function submitTechSignup(){
   if(!/^\d{6}$/.test(pin)){errPin.textContent='6-digit PIN daalo';return;}
   if(pin!==pinConfirm){errPin.textContent='Dono PIN match nahi kar rahe';return;}
   errPin.textContent='';
+  const submitBtn=document.querySelector('#tsStep6 .ts-btn');
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='Saving…';}
+
   const name=document.getElementById('tsName').value.trim();
   const rawPhone=document.getElementById('tsPhone').value.trim();
-  const phone=rawPhone.replace(/\D/g,'').slice(-10); // normalize to 10 digits
+  const phone=rawPhone.replace(/\D/g,'').slice(-10);
   const payload={
     name,phone,
     email:document.getElementById('tsEmail').value.trim(),
@@ -1132,16 +1135,28 @@ async function submitTechSignup(){
     experience:tsSelectedExp,
     role:'tech'
   };
-  // Attach ABD referral ID if technician came via referral link
   const abdRef = sessionStorage.getItem('kwikar_abd_ref');
-  if (abdRef) payload.abd_id = abdRef;
+  if(abdRef) payload.abd_id = abdRef;
+
+  // Save to database — check response properly
   try{
-    await fetch('/mono-kwikar/backend/booking_api.php',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'save_technician',...payload,pin})
+    const res  = await fetch(_BASE+'/backend/booking_api.php',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'save_technician',...payload,pin})
     });
-  }catch(e){}
-  // Save to tech registry only (NOT kwikar_user — that is for customers)
+    const json = await res.json();
+    if(!json.success){
+      errPin.textContent = json.error || 'Registration failed. Please try again.';
+      if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='Submit 🚀';}
+      return;
+    }
+  }catch(e){
+    errPin.textContent='Network error. Check connection and try again.';
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='Submit 🚀';}
+    return;
+  }
+
+  // Save to local registry
   if(name&&phone){
     const registry=JSON.parse(localStorage.getItem('kwikar_tech_registry')||'{}');
     const entry={...payload};
@@ -1152,13 +1167,18 @@ async function submitTechSignup(){
       try{localStorage.setItem('kwikar_tech_avatar_'+phone,window._tsPhotoDataUrl);}catch(_){}
     }
   }
-  showTsStep('done');
-  if(name){
-    setTimeout(()=>{
-      closeTechSignup();
-      redirectToTechPanel(name, payload.phone||'', payload.email||'', payload.skills||'');
-    },2200);
-  }
+
+  // Show success popup then redirect to tech panel
+  window._pendingTechRedirect = {name:payload.name, phone:payload.phone, email:payload.email, skills:payload.skills};
+  closeTechSignup();
+  showAbdRegSuccess();
+  setTimeout(()=>{
+    if(window._pendingTechRedirect){
+      const p=window._pendingTechRedirect;
+      window._pendingTechRedirect=null;
+      redirectToTechPanel(p.name,p.phone,p.email,p.skills);
+    }
+  },4000);
 }
 
 /* ══════════ SEARCH BAR ANIMATION ══════════ */
@@ -1442,7 +1462,7 @@ async function submitBooking(){
       user.profession = prof;
       localStorage.setItem('kwikar_user', JSON.stringify(user));
       // Save profession to DB (fire-and-forget)
-      fetch('/mono-kwikar/backend/user_api.php?action=save_profession',{
+      fetch(_BASE+'/backend/user_api.php?action=save_profession',{
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({user_id: user.user_id, profession: prof})
       }).catch(()=>{});
@@ -1465,7 +1485,7 @@ async function submitBooking(){
   };
 
   try{
-    const res  = await fetch('/mono-kwikar/backend/booking_api.php',{
+    const res  = await fetch(_BASE+'/backend/booking_api.php',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
@@ -1555,7 +1575,7 @@ function showPinSetupPrompt(phone, userId){
     if(a!==b){errEl.textContent='Dono PIN match nahi kar rahe';return;}
     errEl.textContent='';
     try{
-      const res=await fetch('/mono-kwikar/backend/user_api.php?action=set_pin',{
+      const res=await fetch(_BASE+'/backend/user_api.php?action=set_pin',{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({phone,pin:a})
       });
@@ -1575,54 +1595,103 @@ function showPinSetupPrompt(phone, userId){
 }
 
 // ── ABD Referral Link Handler ─────────────────────────────────────────────
-// Triggered when technician opens: /frontend/index.html?abd_ref=<id>&join=tech
+// Triggered when: /frontend/index.html?abd_ref=<id>&join=tech
 (function(){
-  const p = new URLSearchParams(window.location.search);
+  const p      = new URLSearchParams(window.location.search);
   const abdRef = p.get('abd_ref');
   const join   = p.get('join');
   if (!abdRef || join !== 'tech') return;
 
-  // Store the ABD ID so submitTechSignup() can include it
   sessionStorage.setItem('kwikar_abd_ref', abdRef);
 
-  // Fetch ABD's pincodes and store them for step 3
-  fetch('/mono-kwikar/backend/booking_api.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  // Fetch ABD's pincodes for step 3 pills
+  fetch(_BASE+'/backend/booking_api.php', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'get_abd_pincodes', abd_id: abdRef })
   })
   .then(r => r.json())
   .then(data => {
     if (data.success && data.pincodes && data.pincodes.length) {
-      window._abdRefPincodes = data.pincodes; // [{pincode, city}, ...]
+      window._abdRefPincodes = data.pincodes;
       renderAbdPincodePills();
+      renderAbdCustPinPills(); // also render in customer form
     }
   })
   .catch(() => {});
 
-  // Auto-open technician signup form once the page is interactive
-  function tryOpen() {
-    if (typeof openTechSignup === 'function') {
-      openTechSignup();
-    }
+  // Show role-choice modal instead of directly opening tech form
+  function tryShow() {
+    const el = document.getElementById('abdRefChoiceOverlay');
+    if (el) el.style.display = 'flex';
   }
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(tryOpen, 600));
+    document.addEventListener('DOMContentLoaded', () => setTimeout(tryShow, 400));
   } else {
-    setTimeout(tryOpen, 600);
+    setTimeout(tryShow, 400);
   }
 })();
+
+// ── Role choice handler ───────────────────────────────────────────────────
+function abdChooseRole(role) {
+  document.getElementById('abdRefChoiceOverlay').style.display = 'none';
+  if (role === 'tech') {
+    openTechSignup();
+  } else {
+    // Jump straight to customer registration step — skip role selector & phone login view
+    _loginRole = 'user';
+    _showOnly('loginRegStep1');
+    try { document.getElementById('regErr1').textContent = ''; } catch(_){}
+    try { document.getElementById('regName').value = ''; } catch(_){}
+    try { document.getElementById('regPhone').value = ''; } catch(_){}
+    document.getElementById('loginOverlay').classList.add('show');
+    setTimeout(() => { try { document.getElementById('regName').focus(); } catch(_){} }, 150);
+  }
+}
+
+// ── Shared success overlay ────────────────────────────────────────────────
+function showAbdRegSuccess() {
+  const overlay = document.getElementById('abdRegSuccessOverlay');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  // If a tech redirect is pending, show countdown on the button
+  const btn = overlay.querySelector('.abdr-btn');
+  if (btn && window._pendingTechRedirect) {
+    let secs = 4;
+    btn.textContent = 'Panel par Jaao → (' + secs + 's)';
+    const iv = setInterval(() => {
+      secs--;
+      if (secs > 0) {
+        btn.textContent = 'Panel par Jaao → (' + secs + 's)';
+      } else {
+        clearInterval(iv);
+        btn.textContent = 'Panel par Jaao →';
+      }
+    }, 1000);
+  }
+}
+
+function abdRegSuccessClose() {
+  document.getElementById('abdRegSuccessOverlay').style.display = 'none';
+  const ts = document.getElementById('tsOverlay');
+  if (ts) ts.classList.remove('show');
+  // If a technician just registered, redirect to their panel
+  if (window._pendingTechRedirect) {
+    const p = window._pendingTechRedirect;
+    window._pendingTechRedirect = null;
+    redirectToTechPanel(p.name, p.phone, p.email, p.skills);
+  }
+}
 
 function renderAbdPincodePills() {
   const container = document.getElementById('abdRefPincodes');
   if (!container || !window._abdRefPincodes || !window._abdRefPincodes.length) return;
   container.innerHTML =
-    '<div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px;">ABD ke service areas — tap karke select karo:</div>' +
+    '<div class="abd-ref-label">📍 ABD ke service areas — tap karke select karo</div>' +
+    '<div class="abd-ref-pills">' +
     window._abdRefPincodes.map(pc =>
-      `<button type="button" class="abd-pin-pill" onclick="selectAbdPin('${pc.pincode}')" id="abdpill_${pc.pincode}">
-        📍 ${pc.pincode}${pc.city ? ' · ' + pc.city : ''}
-      </button>`
-    ).join('');
+      `<button type="button" class="abd-pin-pill" onclick="selectAbdPin('${pc.pincode}')" id="abdpill_${pc.pincode}">${pc.pincode}${pc.city ? '<span class="abd-pill-city"> · ' + pc.city + '</span>' : ''}</button>`
+    ).join('') +
+    '</div>';
   container.style.display = 'block';
 }
 
@@ -1784,7 +1853,7 @@ async function pollBookingStatus(){
   try{
     const phone=JSON.parse(raw).phone;
     if(!phone) return;
-    const res=await fetch('/mono-kwikar/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(phone));
+    const res=await fetch(_BASE+'/backend/user_api.php?action=get_bookings&phone='+encodeURIComponent(phone));
     const json=await res.json();
     if(!json.success||!json.bookings) return;
     json.bookings.forEach(b=>{

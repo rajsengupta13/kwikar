@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kwikar-abd-v1.1.4';
+const CACHE_NAME = 'kwikar-abd-v1.1.5';
 const SHELL = [
   './index.html',
   './kwikar-data.js',

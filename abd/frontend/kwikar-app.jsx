@@ -31,7 +31,7 @@ function LoginPage({ onLogin }) {
         setError(res.error || res.message || 'Login failed');
       }
     } catch (ex) {
-      setError('Network error — check connection');
+      setError('Server error: ' + (ex.message || 'check connection'));
     }
     setLoading(false);
   }

@@ -249,7 +249,7 @@ function AddTechModal({ onClose }) {
   const sess    = window.ABD_SESSION || {};
   const abdId   = sess.abd_id   || '';
   const abdName = sess.full_name || 'ABD';
-  const base    = window.location.origin + '/mono-kwikar';
+  const base    = window.location.origin + window.location.pathname.replace(/\/abd\/.*$/, '');
   const link    = `${base}/frontend/index.html?abd_ref=${abdId}&join=tech`;
   const waMsg   = `Namaste! 🙏\n\n*${abdName}* aapko *Kwikar* technician partner banne ke liye invite kar rahe hain! 🔧\n\n✅ Apne area mein booking milegi\n✅ Seedhe customer se payment\n✅ Koi commission cut nahi\n\nAbhi register karein 👇\n${link}`;
   const waUrl   = `https://wa.me/?text=${encodeURIComponent(waMsg)}`;

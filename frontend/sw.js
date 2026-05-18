@@ -7,9 +7,9 @@
      • Form data      → Background Sync queue
 ═══════════════════════════════════════════════ */
 
-const CACHE_STATIC  = 'kwikar-static-v1.3.0';
-const CACHE_IMAGES  = 'kwikar-images-v1.3.0';
-const CACHE_PAGES   = 'kwikar-pages-v1.3.0';
+const CACHE_STATIC  = 'kwikar-static-v1.4.0';
+const CACHE_IMAGES  = 'kwikar-images-v1.4.0';
+const CACHE_PAGES   = 'kwikar-pages-v1.4.0';
 const ALL_CACHES    = [CACHE_STATIC, CACHE_IMAGES, CACHE_PAGES];
 const OFFLINE_URL   = 'offline.html';
 

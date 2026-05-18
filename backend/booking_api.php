@@ -19,6 +19,28 @@ $data   = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = $data['action'] ?? $_GET['action'] ?? '';
 
 // ═══════════════════════════════════════════════════════════════
+// get_abd_pincodes
+// Returns pincode list for a given ABD ID (used on technician referral form).
+// ═══════════════════════════════════════════════════════════════
+if ($action === 'get_abd_pincodes') {
+    $abdId = (int) ($data['abd_id'] ?? $_GET['abd_id'] ?? 0);
+    if (!$abdId) { echo json_encode(['success' => false, 'pincodes' => []]); exit; }
+
+    $st = $pdo->prepare("
+        SELECT p.pincode, p.city
+        FROM   abd_pincodes ap
+        JOIN   pincodes p ON p.id = ap.pincode_id
+        WHERE  ap.abd_id = ?
+        ORDER  BY ap.is_primary DESC, p.pincode ASC
+    ");
+    $st->execute([$abdId]);
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode(['success' => true, 'pincodes' => $rows]);
+    exit;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // check_pincode
 // Checks the pincodes table for serviceability.
 // Seed from config on first encounter so the table is auto-populated.
@@ -275,6 +297,7 @@ if ($action === 'save_technician') {
             name     = VALUES(name),
             email    = IF(VALUES(email) != '', VALUES(email), email),
             pass_pin = IF(VALUES(pass_pin) != '', VALUES(pass_pin), pass_pin),
+            role     = 'technician',
             updated_at = NOW()
     ")->execute([$name, $phone, $email, $pinHash]);
 

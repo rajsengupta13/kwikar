@@ -1,1 +1,6 @@
 [2026-05-16 11:08:57] [INFO] Technician registered | {"phone":"7894563210","user_id":12,"tech_id":4,"abd_id":2} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-16 17:30:14] [INFO] User registered | {"phone":"6205531392","user_id":1} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=register
+[2026-05-16 17:37:09] [INFO] User registered | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=register
+[2026-05-16 17:59:21] [INFO] User registered | {"phone":"8523697410","user_id":18} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=register
+[2026-05-16 18:51:45] [INFO] Technician registered | {"phone":"8523146970","user_id":20,"tech_id":9,"abd_id":5} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-16 19:08:59] [INFO] Technician registered | {"phone":"8756941230","user_id":21,"tech_id":10,"abd_id":5} | IP:::1 POST /mono-kwikar/backend/booking_api.php

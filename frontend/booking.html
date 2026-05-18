@@ -357,16 +357,17 @@ input,textarea,select{font-family:inherit}
 </div>
 
 <script>
-const API = '/mono-kwikar/backend/booking_api.php';
+const _BASE = window.location.pathname.replace(/\/frontend\/.*$/, '');
+const API = _BASE + '/backend/booking_api.php';
 
 const SERVICES = {
-  ac:       { name:'AC Service',             img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/17a584e4b-6224-4818-abb0-bffc1b5a0991.png' },
-  fridge:   { name:'Refrigerator Service',   img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1428e2381-2d29-4a10-9479-988bf2c62fde.png' },
-  washing:  { name:'Washing Machine Service',img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1cf6d8693-f778-4992-b5b7-fd667000bfd4.png' },
-  tv:       { name:'TV Repair',              img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1fe1b2539-b2c5-4372-9c86-f2ac2c7a5bac.png' },
-  ro:       { name:'RO Purifier Service',    img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1307feaba-a78b-4cf0-ad09-5ef0e5e8f0b4.png' },
-  geyser:   { name:'Geyser Repair',          img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/101150c48-08ec-42cb-bb9b-428988ab1f9a.png' },
-  microwave:{ name:'Microwave Repair',       img:'https://image.qwenlm.ai/public_source/0992fe8d-20a7-4f1a-a776-4061a6cbefd5/1961ad9f4-64bd-4c25-949e-f2aca885ceb1.png' },
+  ac:       { name:'AC Service',             img:'images/ac-repair.png' },
+  fridge:   { name:'Refrigerator Service',   img:'images/fridge-repair.png' },
+  washing:  { name:'Washing Machine Service',img:'images/wm-repair.png' },
+  tv:       { name:'TV Repair',              img:'images/tv-repair.png' },
+  ro:       { name:'RO Purifier Service',    img:'images/ro-repair.png' },
+  geyser:   { name:'Geyser Repair',          img:'images/geyser-repair.png' },
+  microwave:{ name:'Microwave Repair',       img:'images/microwave-repair.png' },
   other:    { name:'Other Service',          img:null }
 };
 

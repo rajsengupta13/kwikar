@@ -1,22 +1,35 @@
 <?php
-require_once '../config/database.php';
-
+// Headers FIRST — ensures JSON is always returned even if a require fails
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
+// Catch fatal errors (require failures, syntax errors in included files)
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) http_response_code(500);
+        echo json_encode([
+            'success' => false, 'status' => 'error',
+            'error'   => 'Server error: ' . $err['message'],
+            'message' => 'Server error: ' . $err['message'],
+        ]);
+    }
+});
+
 set_exception_handler(function (Throwable $e) {
     if (!headers_sent()) http_response_code(500);
     echo json_encode([
-        'success' => false,
-        'status'  => 'error',
+        'success' => false, 'status' => 'error',
         'error'   => $e->getMessage(),
         'message' => $e->getMessage(),
     ]);
     exit;
 });
+
+require_once '../config/database.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

@@ -544,23 +544,23 @@
   <div id="root"></div>
 
   <!-- Data — v5 forces browser to reload, bypassing cache -->
-  <script src="kwikar-data.js?v=21"></script>
+  <script src="kwikar-data.js?v=22"></script>
 
   <!-- Components: load order matters — each builds on the previous -->
-  <script type="text/babel" src="kwikar-ui.jsx?v=21"></script>
-  <script type="text/babel" src="tweaks-panel.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-sidebar.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-tree.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-pages-a.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-pages-b.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-pincodes.jsx?v=21"></script>
-  <script type="text/babel" src="kwikar-app.jsx?v=21"></script>
+  <script type="text/babel" src="kwikar-ui.jsx?v=22"></script>
+  <script type="text/babel" src="tweaks-panel.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-sidebar.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-tree.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pages-a.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pages-b.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pincodes.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-app.jsx?v=22"></script>
 
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js?v=21')
+        navigator.serviceWorker.register('./sw.js?v=22')
           .then(function(reg) { console.log('ABD SW registered:', reg.scope); })
           .catch(function(err) { console.warn('ABD SW registration failed:', err); });
       });
