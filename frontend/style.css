@@ -143,7 +143,7 @@ button{font-family:inherit}
 @keyframes scrollP{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(6px);opacity:.3}}
 
 /* ══ SERVICES GRID (NEW — "Kya Chahiye Aapko?") ══ */
-.live-ticker{height:36px;display:flex;align-items:center;overflow:hidden;background:linear-gradient(90deg,#dce8ff,#ecf2ff);margin-top:64px}.ticker-inner{display:flex;align-items:center;gap:14px;animation:tickerRoll 70s linear infinite;will-change:transform;padding:0 31px;height:100%;width:max-content}.ticker-card{flex-shrink:0;background:#fff;border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:700;color:#0d1b3e;white-space:nowrap;box-shadow:0 1px 4px rgba(13,27,62,.1);border:1px solid rgba(13,27,62,.1)}@keyframes tickerRoll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}@media(max-width:640px){.live-ticker{position:fixed;top:calc(52px + var(--safe-top));left:0;right:0;z-index:299;margin-top:0;height:32px}.ticker-inner{animation-duration:130s}.ticker-card{font-size:.67rem;padding:4px 12px}}
+.live-ticker{height:36px;display:flex;align-items:center;overflow:hidden;background:linear-gradient(90deg,#dce8ff,#ecf2ff);margin-top:64px}.ticker-inner{display:flex;align-items:center;gap:14px;animation:tickerRoll 70s linear infinite;will-change:transform;padding:0 31px;height:100%;width:max-content}.ticker-card{flex-shrink:0;background:#fff;border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:700;color:#0d1b3e;white-space:nowrap;box-shadow:0 1px 4px rgba(13,27,62,.1);border:1px solid rgba(13,27,62,.1)}@keyframes tickerRoll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}@media(max-width:640px){.live-ticker{position:fixed;top:calc(48px + var(--safe-top));left:0;right:0;z-index:299;margin-top:0;height:32px}.ticker-inner{animation-duration:130s}.ticker-card{font-size:.67rem;padding:4px 12px}}
 
 
 
@@ -511,6 +511,13 @@ footer{background:#0c1629;color:rgba(255,255,255,.65);padding:24px 5% calc(28px 
 .f-bottom a:hover{color:var(--blue)}
 .starwebx{display:flex;align-items:center;gap:8px;font-size:.78rem;color:rgba(255,255,255,.35)}
 .starwebx strong{color:rgba(255,255,255,.65);font-weight:700}
+.footer-panel-links{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.footer-panel-btn{display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);font-size:.74rem;font-weight:500;cursor:pointer;transition:all .2s;letter-spacing:.01em}
+.footer-panel-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25)}
+.footer-panel-btn--abd{color:rgba(167,139,250,.85);border-color:rgba(167,139,250,.2)}
+.footer-panel-btn--abd:hover{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:#a78bfa}
+.footer-panel-btn--admin{color:rgba(34,211,238,.85);border-color:rgba(34,211,238,.2)}
+.footer-panel-btn--admin:hover{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.4);color:#22d3ee}
 
 /* ══ PUSH NOTIF PROMPT ══ */
 #push-prompt{
@@ -655,10 +662,10 @@ body.modal-open{overflow:hidden}
 /* ══ LOGIN / PROFILE / BOOKINGS MODALS (global — work on all screen sizes) ══ */
 .login-overlay{position:fixed;inset:0;z-index:600;background:rgba(4,9,20,.75);display:none;align-items:center;justify-content:center;padding:16px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .login-overlay.show{display:flex;animation:fadeIn .22s ease}
-.login-box{background:#fff;border-radius:26px;width:100%;max-width:390px;position:relative;animation:popUp .38s cubic-bezier(.16,1.4,.3,1) both;overflow:hidden;box-shadow:0 32px 80px rgba(4,9,20,.45)}
+.login-box{background:#fff;border-radius:26px;width:100%;max-width:390px;max-height:92vh;overflow-y:auto;position:relative;animation:popUp .38s cubic-bezier(.16,1.4,.3,1) both;box-shadow:0 32px 80px rgba(4,9,20,.45)}
 @keyframes popUp{from{opacity:0;transform:translateY(40px) scale(.93)}to{opacity:1;transform:none}}
 .login-box.scrollable{max-height:92vh;overflow-y:auto}
-.login-header{background:linear-gradient(135deg,#060e20 0%,#0d1b3e 55%,#152444 100%);padding:20px 20px 18px;text-align:center;position:relative}
+.login-header{background:linear-gradient(135deg,#060e20 0%,#0d1b3e 55%,#152444 100%);padding:20px 20px 18px;text-align:center;position:sticky;top:0;z-index:2}
 .login-header-logo{font-size:1.35rem;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1}
 .login-header-logo em{color:#f59e0b;font-style:normal}
 .login-header-sub{font-size:.62rem;color:rgba(255,255,255,.4);letter-spacing:.9px;text-transform:uppercase;margin-top:3px}
@@ -682,7 +689,13 @@ body.modal-open{overflow:hidden}
 .lrc-check{position:absolute;right:14px;top:50%;transform:translateY(-50%) scale(.5);opacity:0;transition:all .3s cubic-bezier(.4,0,.2,1);color:#0d1b3e;flex-shrink:0}
 .login-role-card.lrc-selected .lrc-check{opacity:1;transform:translateY(-50%) scale(1)}
 .lrc-icon-box--abd{background:rgba(255,90,31,0.1);color:#ff5a1f}
+.lrc-icon-box--admin{background:rgba(99,102,241,0.12);color:#6366f1}
 .lrc-role-badge{font-size:10px;background:rgba(255,90,31,0.12);color:#ff5a1f;padding:1px 6px;border-radius:10px;font-weight:700;margin-left:4px}
+.lrc-role-badge--admin{background:rgba(99,102,241,0.12);color:#6366f1}
+.lrc-admin-btn{background:linear-gradient(135deg,#6366f1,#4f46e5) !important;box-shadow:0 4px 14px rgba(99,102,241,.35)}
+.admin-auth-tabs{display:flex;gap:6px;background:#f1f5f9;border-radius:10px;padding:4px;margin-top:4px}
+.admin-tab{flex:1;padding:8px;border:none;border-radius:7px;background:transparent;font-family:inherit;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;transition:all .2s}
+.admin-tab.active{background:#fff;color:#6366f1;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .lrc-continue{width:100%;height:52px;background:#0d1b3e;color:#fff;border:none;border-radius:14px;font-family:inherit;font-size:.96rem;font-weight:700;cursor:not-allowed;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .3s ease;opacity:.45;letter-spacing:.2px}
 .lrc-continue.lrc-active{opacity:1;cursor:pointer}
 .lrc-continue.lrc-active:hover{background:#1a3a6e;transform:translateY(-1px);box-shadow:0 6px 18px rgba(13,27,62,.22)}

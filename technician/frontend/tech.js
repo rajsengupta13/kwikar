@@ -57,14 +57,10 @@ const TECH = {
 // ── Fallback / demo data (replaced by API on load) ────────
 let JOBS = [];
 let NOTIFS = [];
-let TXNS = [
-  { id:'KW-1024', desc:'AC Repair — Priya Sharma',    amt:850,  type:'cr', date:'Today, 10:30 AM',   ico:'fas fa-tools',     ibg:'var(--success-dim)', ic:'var(--success)' },
-  { id:'W-482',   desc:'Withdrawal → HDFC Bank',      amt:5000, type:'dr', date:'May 7, 9:00 AM',    ico:'fas fa-university',ibg:'var(--danger-dim)',  ic:'var(--danger)'  },
-  { id:'KW-1022', desc:'Washing Machine — Geeta',     amt:450,  type:'cr', date:'May 6, 12:00 PM',   ico:'fas fa-tools',     ibg:'var(--success-dim)', ic:'var(--success)' },
-];
+let TXNS = [];
 
-const WEEK_DATA   = [1200,1800,1400,2200,1600,2800,1800];
-const WEEK_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+let WEEK_DATA   = [0,0,0,0,0,0,0];
+let WEEK_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 // ── API ───────────────────────────────────────────────────
 const API = '../backend/api/api.php';
@@ -339,7 +335,131 @@ function initEarnChart() {
   });
 }
 
+// ── Helpers ───────────────────────────────────────────────
+function fmt(n) {
+  const v = parseFloat(n) || 0;
+  if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
+  return '₹' + v.toLocaleString('en-IN');
+}
+function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
 // ── API Loaders ───────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const res  = await fetch(API + '?module=dashboard');
+    const data = await res.json();
+    if (data.status !== 'success') return;
+
+    const s = data.stats || {};
+    const js = data.job_status || {};
+    const p  = data.profile   || {};
+
+    // Hero pills
+    const rating = parseFloat(s.rating || p.rating || 0);
+    set('heroPillRating', rating > 0 ? rating.toFixed(1) + ' ★' : '— ★');
+    set('heroPillJobs',   (s.total_jobs || p.total_jobs || 0));
+
+    // Hero subtitle
+    const todayCount = s.today_jobs || 0;
+    set('heroSub', todayCount > 0
+      ? `${todayCount} job${todayCount > 1 ? 's' : ''} scheduled today · Stay on top of your game`
+      : 'No jobs scheduled today · Ready for new work!');
+
+    // Stat cards
+    set('statJobsToday',    s.today_jobs || 0);
+    set('statJobsTodaySub', `${s.today_completed || 0} done today`);
+    set('statTodayEarnings', fmt(s.today_earnings));
+    set('statMonthEarnings', fmt(s.month_earnings));
+
+    const completed  = parseInt(js.completed_count) || 0;
+    const cancelled  = parseInt(js.cancelled_count) || 0;
+    const ongoing    = parseInt(js.ongoing_count)   || 0;
+    const total      = completed + cancelled;
+    const compRate   = total > 0 ? Math.round((completed / total) * 100) : 0;
+    set('statCompletionRate', compRate + '%');
+
+    // Performance ring
+    set('perfRingText', compRate + '%');
+    set('perfCompleted', completed + ' jobs');
+    set('perfCancelled', cancelled + ' jobs');
+    set('perfOngoing',   ongoing   + ' jobs');
+    set('perfRating',    rating > 0 ? rating.toFixed(1) + ' ★' : '—');
+    const circle = document.getElementById('perfRingCircle');
+    if (circle) {
+      const circumference = 263.9;
+      circle.setAttribute('stroke-dashoffset', (circumference - (compRate / 100) * circumference).toFixed(1));
+    }
+
+    // Monthly goal (goal = ₹50,000)
+    const GOAL = 50000;
+    const monthEarn = parseFloat(s.month_earnings) || 0;
+    const pct = Math.min(100, Math.round((monthEarn / GOAL) * 100));
+    set('monthGoalPct', pct + '% reached');
+    const bar = document.getElementById('monthGoalBar');
+    if (bar) bar.style.width = pct + '%';
+
+    // Also pre-fill earnings section from dashboard data
+    set('earnBalance',        fmt(s.wallet_balance));
+    set('earnMonth',          fmt(s.month_earnings));
+    set('earnWithdrawn',      fmt(s.total_withdrawn));
+    set('earnJobsCompleted',  completed);
+
+    // Update weekly chart if ready + week % chip
+    if (data.week_chart) {
+      const wc = data.week_chart;
+      WEEK_DATA   = wc.data   || WEEK_DATA;
+      WEEK_LABELS = wc.labels || WEEK_LABELS;
+      const dc = document.getElementById('dashChart');
+      if (dc?._chart) {
+        dc._chart.data.labels            = WEEK_LABELS;
+        dc._chart.data.datasets[0].data  = WEEK_DATA;
+        dc._chart.update();
+      }
+      // Show chip only when there's actual earning data
+      const weekTotal = (wc.data || []).reduce((a, b) => a + b, 0);
+      const chip = document.getElementById('dashWeekChip');
+      if (chip) {
+        if (weekTotal > 0 && wc.prev_week_total != null) {
+          const prev = parseFloat(wc.prev_week_total) || 0;
+          if (prev > 0) {
+            const diff = Math.round(((weekTotal - prev) / prev) * 100);
+            chip.textContent = (diff >= 0 ? '↑ ' : '↓ ') + Math.abs(diff) + '% vs last week';
+            chip.className   = 'chip ' + (diff >= 0 ? 'chip-go' : 'chip-err');
+            chip.style.display = '';
+          } else {
+            chip.style.display = 'none';
+          }
+        } else {
+          chip.style.display = 'none';
+        }
+      }
+    }
+
+    // Update today's schedule from dashboard data
+    if (data.schedule) {
+      JOBS = [
+        ...data.schedule.map(j => ({
+          id:      j.id,
+          name:    j.customer_name || 'Customer',
+          phone:   '',
+          service: j.service_type || 'Service',
+          time:    j.start_time || '',
+          loc:     j.address || 'Address not available',
+          amt:     parseFloat(j.amount) || 0,
+          status:  j.status || 'new',
+        })),
+      ];
+      renderSchedule();
+    }
+
+    // Notification badge
+    if (data.unread_count > 0) {
+      const dot = document.getElementById('notifBadgeDot');
+      if (dot) dot.classList.add('show');
+    }
+  } catch(e) {}
+}
+
 async function loadJobsFromAPI() {
   try {
     const [rNew, rOng, rDone] = await Promise.all([
@@ -390,18 +510,57 @@ async function loadWallet() {
     const res  = await fetch(API+'?module=wallet');
     const data = await res.json();
     if (data.status === 'success') {
-      if (data.transactions?.length) {
-        TXNS = data.transactions.map(t => ({
-          id:   t.transaction_id || t.id,
-          desc: t.description || '',
-          amt:  parseFloat(t.amount) || 0,
-          type: t.type === 'credit' ? 'cr' : 'dr',
-          date: (t.transaction_date || '').split('T')[0],
-          ico:  t.type === 'debit' ? 'fas fa-university' : 'fas fa-tools',
-          ibg:  t.type === 'debit' ? 'var(--danger-dim)' : 'var(--success-dim)',
-          ic:   t.type === 'debit' ? 'var(--danger)'     : 'var(--success)'
-        }));
+      // Update earnings section balance/stats
+      set('earnBalance',      fmt(data.available_balance));
+      set('earnMonth',        fmt(data.month_earnings));
+      set('earnPending',      fmt(data.pending_payout));
+      set('earnPendingPayout', fmt(data.pending_payout));
+
+      const bal = parseFloat(data.available_balance) || 0;
+      const mon = parseFloat(data.month_earnings)    || 0;
+      const pen = parseFloat(data.pending_payout)    || 0;
+      set('earnRingText',      fmt(mon));
+      set('earnBreakCompleted', fmt(mon - pen));
+      set('earnBreakPending',   fmt(pen));
+      set('earnBreakBalance',   fmt(bal));
+      set('earnWithdrawn',      fmt(data.total_withdrawn || 0));
+
+      // Update 7-day chart with real data
+      if (data.week_chart?.data) {
+        WEEK_DATA   = data.week_chart.data;
+        WEEK_LABELS = data.week_chart.labels || WEEK_LABELS;
+        const ec = document.getElementById('earnChart');
+        if (ec?._chart) {
+          ec._chart.data.labels             = WEEK_LABELS;
+          ec._chart.data.datasets[0].data   = WEEK_DATA;
+          ec._chart.update();
+        }
+        // Show earn chip only when there's real data + a valid comparison
+        const weekTotal = WEEK_DATA.reduce((a, b) => a + b, 0);
+        const chip = document.getElementById('earnWeekChip');
+        if (chip) {
+          const prev = parseFloat(data.week_chart.prev_week_total) || 0;
+          if (weekTotal > 0 && prev > 0) {
+            const diff = Math.round(((weekTotal - prev) / prev) * 100);
+            chip.textContent = (diff >= 0 ? '↑ ' : '↓ ') + Math.abs(diff) + '% vs last week';
+            chip.className   = 'chip ' + (diff >= 0 ? 'chip-go' : 'chip-err');
+            chip.style.display = '';
+          } else {
+            chip.style.display = 'none';
+          }
+        }
       }
+
+      TXNS = (data.transactions || []).map(t => ({
+        id:   t.transaction_id || t.id,
+        desc: t.description || t.note || 'Transaction',
+        amt:  parseFloat(t.amount) || 0,
+        type: t.transaction_type === 'credit' ? 'cr' : 'dr',
+        date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '',
+        ico:  t.transaction_type === 'debit' ? 'fas fa-university' : 'fas fa-tools',
+        ibg:  t.transaction_type === 'debit' ? 'var(--danger-dim)' : 'var(--success-dim)',
+        ic:   t.transaction_type === 'debit' ? 'var(--danger)'     : 'var(--success)'
+      }));
     }
   } catch(e) {}
 }
@@ -681,10 +840,10 @@ async function bootApp() {
       }
     } catch(e) {}
 
-    await Promise.all([loadJobsFromAPI(), loadNotifsFromAPI()]);
-    // Start polling every 30s for new jobs
+    await Promise.all([loadDashboard(), loadJobsFromAPI(), loadNotifsFromAPI()]);
+    // Start polling every 10s for new jobs
     pollNewJobs(); // baseline — no beep on first call
-    setInterval(pollNewJobs, 30000);
+    setInterval(pollNewJobs, 10000);
   }
 
   initGreeting();

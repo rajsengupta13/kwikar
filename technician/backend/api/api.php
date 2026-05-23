@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 require_once __DIR__ . '/../config/database.php';
 session_start();
 
@@ -198,14 +200,52 @@ switch ($module) {
 
         // All-time job status counts
         $st = $db->prepare("
-            SELECT SUM(status IN ('new','broadcasted')) AS new_count,
-                   SUM(status = 'ongoing')              AS ongoing_count,
-                   SUM(status = 'completed')            AS completed_count
+            SELECT SUM(status IN ('new','broadcasted'))            AS new_count,
+                   SUM(status IN ('ongoing','accepted','arrived')) AS ongoing_count,
+                   SUM(status = 'completed')                       AS completed_count,
+                   SUM(status = 'cancelled')                       AS cancelled_count
             FROM   bookings
             WHERE  assigned_technician_id = ?
         ");
         $st->execute([$tid]);
         $jobStatus = $st->fetch(PDO::FETCH_ASSOC);
+
+        // 7-day earnings chart
+        $st = $db->prepare("
+            SELECT DATE(wt.created_at) AS day, COALESCE(SUM(wt.amount),0) AS amt
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  wt.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            GROUP  BY DATE(wt.created_at)
+        ");
+        $st->execute([$techUserId]);
+        $chartMap = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) $chartMap[$row['day']] = (float)$row['amt'];
+        $weekData   = [];
+        $weekLabels = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $day          = date('Y-m-d', strtotime("-{$i} days"));
+            $weekData[]   = $chartMap[$day] ?? 0;
+            $weekLabels[] = date('D', strtotime($day));
+        }
+
+        // Previous week total (for % chip)
+        $st = $db->prepare("
+            SELECT COALESCE(SUM(wt.amount),0) AS t
+            FROM   wallet_transactions wt
+            JOIN   wallets w ON wt.wallet_id = w.id
+            WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+              AND  wt.created_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+              AND  wt.created_at <  DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        ");
+        $st->execute([$techUserId]);
+        $prevWeekTotal = (float)$st->fetch(PDO::FETCH_ASSOC)['t'];
+
+        // Total withdrawn all-time
+        $st = $db->prepare("SELECT COALESCE(SUM(amount),0) AS t FROM withdrawal_requests WHERE user_id=? AND status='paid'");
+        $st->execute([$techUserId]);
+        $totalWithdrawn = (float)$st->fetch(PDO::FETCH_ASSOC)['t'];
 
         // Recent notifications
         $st = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 4");
@@ -225,14 +265,20 @@ switch ($module) {
                 'today_completed' => (int) $jc['completed'],
                 'today_earnings'  => $todayEarnings,
                 'month_earnings'  => $monthEarnings,
-                'total_withdrawn' => $withdrawn,
+                'total_withdrawn' => $totalWithdrawn,
                 'wallet_balance'  => (float) $wallet['balance'],
                 'rating'          => (float) ($profile['rating'] ?? 0),
                 'total_jobs'      => (int) ($profile['total_jobs'] ?? 0),
             ],
             'schedule'      => $schedule,
             'ongoing_jobs'  => $ongoing,
-            'job_status'    => $jobStatus,
+            'job_status'    => [
+                'new_count'       => (int) $jobStatus['new_count'],
+                'ongoing_count'   => (int) $jobStatus['ongoing_count'],
+                'completed_count' => (int) $jobStatus['completed_count'],
+                'cancelled_count' => (int) $jobStatus['cancelled_count'],
+            ],
+            'week_chart'    => ['data' => $weekData, 'labels' => $weekLabels, 'prev_week_total' => $prevWeekTotal],
             'notifications' => $notifs,
             'unread_count'  => $unread,
         ]);
@@ -523,11 +569,49 @@ switch ($module) {
             $st->execute([$techUserId]);
             $history = $st->fetchAll(PDO::FETCH_ASSOC);
 
+            // 7-day chart
+            $st = $db->prepare("
+                SELECT DATE(wt.created_at) AS day, COALESCE(SUM(wt.amount), 0) AS amt
+                FROM   wallet_transactions wt
+                JOIN   wallets w ON wt.wallet_id = w.id
+                WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+                  AND  wt.created_at >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+                GROUP  BY DATE(wt.created_at)
+            ");
+            $st->execute([$techUserId]);
+            $wMap = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $wMap[$r['day']] = (float)$r['amt'];
+            $wData = []; $wLabels = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $day      = date('Y-m-d', strtotime("-{$i} days"));
+                $wData[]  = $wMap[$day] ?? 0;
+                $wLabels[] = date('D', strtotime($day));
+            }
+
+            // Previous week total (for % chip)
+            $st = $db->prepare("
+                SELECT COALESCE(SUM(wt.amount),0) AS t
+                FROM   wallet_transactions wt
+                JOIN   wallets w ON wt.wallet_id = w.id
+                WHERE  w.user_id = ? AND wt.transaction_type = 'credit'
+                  AND  wt.created_at >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)
+                  AND  wt.created_at <  DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+            ");
+            $st->execute([$techUserId]);
+            $wPrevTotal = (float)$st->fetch(PDO::FETCH_ASSOC)['t'];
+
+            // Total withdrawn
+            $st = $db->prepare("SELECT COALESCE(SUM(amount),0) AS t FROM withdrawal_requests WHERE user_id=? AND status='paid'");
+            $st->execute([$techUserId]);
+            $totalWithdrawn = (float)$st->fetch(PDO::FETCH_ASSOC)['t'];
+
             echo json_encode([
                 'status'            => 'success',
                 'available_balance' => (float) $wallet['balance'],
                 'month_earnings'    => $monthEarnings,
                 'pending_payout'    => $pendingPayout,
+                'total_withdrawn'   => $totalWithdrawn,
+                'week_chart'        => ['data' => $wData, 'labels' => $wLabels, 'prev_week_total' => $wPrevTotal],
                 'transactions'      => $history,
             ]);
 

@@ -127,6 +127,11 @@ input,textarea,select{font-family:inherit}
 .slot-item.selected .slot-radio{border-color:var(--blue);background:var(--blue)}
 .slot-item.selected .slot-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
 
+/* ── SLOT SKELETON ── */
+.slot-skeleton{cursor:default!important;pointer-events:none}
+.skel-line{border-radius:6px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
 /* ── ADDRESS STEP ── */
 .addr-form{display:flex;flex-direction:column;gap:14px}
 .addr-field{display:flex;flex-direction:column;gap:5px}
@@ -357,7 +362,10 @@ input,textarea,select{font-family:inherit}
 </div>
 
 <script>
-const _BASE = window.location.pathname.replace(/\/frontend\/.*$/, '');
+const _BASE = window.location.pathname
+  .replace(/\/frontend\/.*$/, '')
+  .replace(/\/[^/]*\.html$/, '')
+  .replace(/\/$/, '');
 const API = _BASE + '/backend/booking_api.php';
 
 const SERVICES = {
@@ -402,6 +410,7 @@ let selectedDay = '';
 let userName = '';
 let userPhone = '';
 let userProfession = '';
+let availabilityMap = {};  // { 'slot label' => { available, count, total } }
 
 // Pre-fill from localStorage if user is logged in
 (function(){
@@ -471,6 +480,44 @@ function selectIssue(issue, btn) {
   }
 }
 
+function buildSlotsLoading() {
+  const list = document.getElementById('slotsList');
+  list.innerHTML = TIME_SLOTS.map(() => `
+    <div class="slot-item slot-skeleton">
+      <div>
+        <div class="skel-line" style="width:140px;height:16px;margin-bottom:6px"></div>
+        <div class="skel-line" style="width:90px;height:12px"></div>
+      </div>
+      <div class="slot-radio"></div>
+    </div>`).join('');
+  document.getElementById('mainBtn').disabled = true;
+}
+
+function getUserPincode() {
+  try {
+    const u = JSON.parse(localStorage.getItem('kwikar_user') || '{}');
+    return (u.pincode || '').trim();
+  } catch(e) { return ''; }
+}
+
+async function fetchSlotAvailability(dateStr) {
+  availabilityMap = {};
+  const pincode = getUserPincode();
+  if (!pincode || !/^\d{6}$/.test(pincode)) return;
+  // dateStr like "23 May 2026" — PHP strtotime handles this fine
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'slot_availability', pincode, date: dateStr })
+    });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.slots)) {
+      json.slots.forEach(s => { availabilityMap[s.label] = s; });
+    }
+  } catch(e) {}
+}
+
 function buildSchedule() {
   const daysContainer = document.getElementById('daysScroll');
   const now = new Date();
@@ -482,35 +529,71 @@ function buildSchedule() {
     chip.className = 'day-chip' + (i === 0 ? ' selected' : '');
     chip.innerHTML = `<div class="day-name">${i === 0 ? 'Aaj' : DAYS_SHORT[d.getDay()]}</div><div class="day-date">${d.getDate()} ${MONTHS[d.getMonth()]}</div>`;
     const dateStr = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    chip.onclick = () => { document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('selected')); chip.classList.add('selected'); selectedDay=dateStr; buildSlots(i===0); };
+    chip.onclick = (function(idx, ds) { return () => {
+      document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+      selectedDay = ds;
+      buildSlotsLoading();
+      fetchSlotAvailability(ds).then(() => buildSlots(idx === 0));
+    }; })(i, dateStr);
     if (i === 0) selectedDay = dateStr;
     daysContainer.appendChild(chip);
   }
-  buildSlots(true);
+  // Show skeleton while fetching, then build real slots
+  buildSlotsLoading();
+  fetchSlotAvailability(selectedDay).then(() => buildSlots(true));
 }
 
 function buildSlots(isToday) {
   const list = document.getElementById('slotsList');
   const now = new Date();
-  const curHour = now.getHours() + now.getMinutes()/60;
+  const curHour = now.getHours() + now.getMinutes() / 60;
   list.innerHTML = '';
   selectedSlot = '';
   document.getElementById('mainBtn').disabled = true;
 
+  const hasTechData = Object.keys(availabilityMap).length > 0;
+
   let firstAvail = true;
   TIME_SLOTS.forEach(slot => {
-    const disabled = isToday && curHour >= (slot.start - 1.5);
+    const pastDeadline = isToday && curHour >= (slot.start - 1.5);
+    const apiInfo = availabilityMap[slot.label];
+
+    // Determine availability
+    let techUnavailable = false;
+    let availLabel = 'Available';
+    let availClass = '';
+
+    if (pastDeadline) {
+      techUnavailable = true;
+      availLabel = 'Available Nahi';
+      availClass = ' na';
+    } else if (hasTechData && apiInfo) {
+      if (!apiInfo.available) {
+        techUnavailable = true;
+        availLabel = 'Available Nahi';
+        availClass = ' na';
+      } else {
+        availLabel = apiInfo.count === 1
+          ? '1 Technician Available'
+          : `${apiInfo.count} Technicians Available`;
+        availClass = '';
+      }
+    }
+
+    const disabled = pastDeadline || techUnavailable;
     const item = document.createElement('div');
     item.className = 'slot-item' + (disabled ? ' disabled' : '');
     item.innerHTML = `
       <div>
         <div class="slot-time">${slot.label}</div>
-        <div class="slot-avail${disabled?' na':''}">${disabled?'Available Nahi':'Available'}</div>
+        <div class="slot-avail${availClass}">${availLabel}</div>
       </div>
       <div class="slot-radio"></div>`;
+
     if (!disabled) {
       item.onclick = () => {
-        document.querySelectorAll('.slot-item').forEach(s=>s.classList.remove('selected'));
+        document.querySelectorAll('.slot-item').forEach(s => s.classList.remove('selected'));
         item.classList.add('selected');
         selectedSlot = slot.label;
         document.getElementById('mainBtn').disabled = false;

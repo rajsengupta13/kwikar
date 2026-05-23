@@ -22,14 +22,14 @@ function log_error($msg, $ctx = [])   { kwikar_log('ERROR',   $msg, $ctx); }
 function log_warning($msg, $ctx = []) { kwikar_log('WARNING', $msg, $ctx); }
 function log_info($msg, $ctx = [])    { kwikar_log('INFO',    $msg, $ctx); }
 
-// Auto-catch PHP errors
+// Auto-catch PHP errors — return true to suppress PHP's default output handler
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     kwikar_log('PHP_ERROR', $errstr, [
         'code' => $errno,
         'file' => basename($errfile),
         'line' => $errline
     ]);
-    return false;
+    return true;
 });
 
 set_exception_handler(function($e) {

@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -175,8 +177,11 @@ if ($action === 'book') {
     // ── 5. Create booking ─────────────────────────────────────────────
     $problem = $issue . ($otherIssue ? ' — ' . $otherIssue : '');
     $parsedDate = date('Y-m-d', strtotime($slotDate));
-    // Normalize slot_time to HH:MM:SS for TIME column
-    $parsedTime = date('H:i:s', strtotime($slotTime)) ?: '00:00:00';
+    // Extract start time from slot label like "10:00 AM – 12:00 PM"
+    preg_match('/^(\d+:\d+\s*[AP]M)/i', $slotTime, $_tm);
+    $startPart  = $_tm[1] ?? '';
+    $ts         = $startPart ? strtotime($startPart) : false;
+    $parsedTime = ($ts !== false) ? date('H:i:s', $ts) : '10:00:00';
 
     $pdo->prepare("
         INSERT INTO bookings
@@ -287,23 +292,41 @@ if ($action === 'save_technician') {
         exit;
     }
 
-    $pinHash = $pin !== '' ? password_hash($pin, PASSWORD_DEFAULT) : '';
+    $pinHash  = $pin !== '' ? password_hash($pin, PASSWORD_DEFAULT) : '';
+    $emailVal = $email !== '' ? $email : null;
 
-    // 1. Upsert into users (role = technician)
-    $pdo->prepare("
-        INSERT INTO users (name, phone, email, pass_pin, role, status)
-        VALUES (?, ?, ?, ?, 'technician', 'active')
-        ON DUPLICATE KEY UPDATE
-            name     = VALUES(name),
-            email    = IF(VALUES(email) != '', VALUES(email), email),
-            pass_pin = IF(VALUES(pass_pin) != '', VALUES(pass_pin), pass_pin),
-            role     = 'technician',
-            updated_at = NOW()
-    ")->execute([$name, $phone, $email, $pinHash]);
-
-    $st = $pdo->prepare("SELECT id FROM users WHERE phone = ?");
+    // 1. Upsert users by phone (check-then-insert avoids UNIQUE email conflicts)
+    $st = $pdo->prepare("SELECT id FROM users WHERE phone = ? LIMIT 1");
     $st->execute([$phone]);
     $userId = (int) $st->fetchColumn();
+
+    if ($userId) {
+        // Already exists — update name/email/pin/role
+        $pdo->prepare("
+            UPDATE users SET name = ?, role = 'technician', status = 'active',
+                email    = COALESCE(?, email),
+                pass_pin = IF(? != '', ?, pass_pin),
+                updated_at = NOW()
+            WHERE id = ?
+        ")->execute([$name, $emailVal, $pinHash, $pinHash, $userId]);
+    } else {
+        // If email is already taken by another account, skip it (phone+PIN is enough to login)
+        if ($emailVal !== null) {
+            $chk = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ? LIMIT 1");
+            $chk->execute([$emailVal]);
+            if ((int) $chk->fetchColumn() > 0) $emailVal = null;
+        }
+        $pdo->prepare("
+            INSERT INTO users (name, phone, email, pass_pin, role, status)
+            VALUES (?, ?, ?, ?, 'technician', 'active')
+        ")->execute([$name, $phone, $emailVal, $pinHash]);
+        $userId = (int) $pdo->lastInsertId();
+    }
+
+    if (!$userId) {
+        echo json_encode(['success' => false, 'error' => 'User record create nahi ho paya']);
+        exit;
+    }
 
     // 2. Upsert into technicians
     $source = $abdId ? 'abd_direct' : 'website';
@@ -368,6 +391,91 @@ if ($action === 'save_technician') {
 
     log_info('Technician registered', ['phone' => $phone, 'user_id' => $userId, 'tech_id' => $techId, 'abd_id' => $abdId]);
     echo json_encode(['success' => true, 'technician_id' => $techId, 'user_id' => $userId]);
+    exit;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// slot_availability
+// Returns per-slot technician availability for a pincode + date.
+// A slot is unavailable when ALL technicians in that pincode are
+// already booked (assigned/ongoing) during that time window.
+// ═══════════════════════════════════════════════════════════════
+if ($action === 'slot_availability') {
+    $pincode    = trim($data['pincode'] ?? $_GET['pincode'] ?? '');
+    $dateRaw    = trim($data['date']    ?? $_GET['date']    ?? '');
+
+    if (!$pincode || !$dateRaw) {
+        echo json_encode(['success' => false, 'error' => 'pincode and date required']);
+        exit;
+    }
+
+    $parsedDate = date('Y-m-d', strtotime($dateRaw));
+    if (!$parsedDate || $parsedDate === '1970-01-01') {
+        echo json_encode(['success' => false, 'error' => 'Invalid date']);
+        exit;
+    }
+
+    // Pincode → id
+    $st = $pdo->prepare("SELECT id FROM pincodes WHERE pincode = ?");
+    $st->execute([$pincode]);
+    $pincodeId = (int) ($st->fetchColumn() ?: 0);
+
+    if (!$pincodeId) {
+        // Pincode not in DB yet — no registered technicians
+        echo json_encode(['success' => true, 'total_techs' => 0, 'pincode' => $pincode, 'date' => $parsedDate, 'slots' => []]);
+        exit;
+    }
+
+    // Count active technicians serving this pincode
+    $st = $pdo->prepare("
+        SELECT COUNT(DISTINCT t.id)
+        FROM   technicians t
+        JOIN   technician_pincodes tp ON t.id = tp.technician_id
+        WHERE  tp.pincode_id = ? AND t.status = 'active' AND tp.is_active = 1
+    ");
+    $st->execute([$pincodeId]);
+    $totalTechs = (int) $st->fetchColumn();
+
+    // [label, start_time, end_time]
+    $slotDefs = [
+        ['10:00 AM – 12:00 PM', '10:00:00', '11:59:59'],
+        ['12:00 PM – 02:00 PM', '12:00:00', '13:59:59'],
+        ['02:00 PM – 04:00 PM', '14:00:00', '15:59:59'],
+        ['04:00 PM – 06:00 PM', '16:00:00', '17:59:59'],
+        ['06:00 PM – 08:00 PM', '18:00:00', '19:59:59'],
+    ];
+
+    $slots = [];
+    $busyStmt = $pdo->prepare("
+        SELECT COUNT(DISTINCT b.assigned_technician_id)
+        FROM   bookings b
+        JOIN   technician_pincodes tp ON b.assigned_technician_id = tp.technician_id
+        WHERE  tp.pincode_id              = ?
+          AND  b.preferred_date           = ?
+          AND  b.preferred_time BETWEEN ? AND ?
+          AND  b.assigned_technician_id  IS NOT NULL
+          AND  b.status NOT IN ('cancelled','completed')
+    ");
+
+    foreach ($slotDefs as [$label, $tStart, $tEnd]) {
+        $busyStmt->execute([$pincodeId, $parsedDate, $tStart, $tEnd]);
+        $busyCount      = (int) $busyStmt->fetchColumn();
+        $availableCount = max(0, $totalTechs - $busyCount);
+        $slots[] = [
+            'label'     => $label,
+            'available' => $totalTechs > 0 && $availableCount > 0,
+            'count'     => $availableCount,
+            'total'     => $totalTechs,
+        ];
+    }
+
+    echo json_encode([
+        'success'     => true,
+        'total_techs' => $totalTechs,
+        'pincode'     => $pincode,
+        'date'        => $parsedDate,
+        'slots'       => $slots,
+    ]);
     exit;
 }
 

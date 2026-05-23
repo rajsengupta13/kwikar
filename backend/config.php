@@ -13,6 +13,8 @@ return [
     'port' => 3306,
     'charset' => 'utf8mb4',
   ],
+  'admin_secret' => 'KWIKAR@ADMIN#2026',   // Change this secret key
+
   'app' => [
     'env' => 'development',
     'timezone' => 'Asia/Kolkata',

@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 // Headers FIRST — ensures JSON is always returned even if a require fails
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -78,6 +80,20 @@ function ensureAbdSupportTables(PDO $db): void {
             upi_id VARCHAR(100) DEFAULT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $db->exec("
+        CREATE TABLE IF NOT EXISTS abd_notifications (
+            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+            abd_id BIGINT UNSIGNED NOT NULL,
+            type ENUM('earning','referral','booking','complaint','payment','system') DEFAULT 'system',
+            title VARCHAR(255) NOT NULL,
+            message TEXT DEFAULT NULL,
+            is_read TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_abdnotif_abd (abd_id),
+            INDEX idx_abdnotif_read (abd_id, is_read)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 }
@@ -526,7 +542,64 @@ switch ($module) {
         break;
 
     case 'notifications':
-        echo json_encode(['status' => 'success', 'notifications' => [], 'unread_count' => 0]);
+        $action = $d['action'] ?? '';
+
+        if ($action === 'mark_read') {
+            $nid = (int)($d['id'] ?? 0);
+            if ($nid) $db->prepare("UPDATE abd_notifications SET is_read=1 WHERE id=? AND abd_id=?")->execute([$nid, $aid]);
+            echo json_encode(['status' => 'success']); break;
+        }
+        if ($action === 'mark_all_read') {
+            $db->prepare("UPDATE abd_notifications SET is_read=1 WHERE abd_id=?")->execute([$aid]);
+            echo json_encode(['status' => 'success']); break;
+        }
+
+        // Auto-seed notifications from real events if table is empty for this ABD
+        $countSt = $db->prepare("SELECT COUNT(*) FROM abd_notifications WHERE abd_id=?");
+        $countSt->execute([$aid]);
+        if ((int)$countSt->fetchColumn() === 0) {
+            // From commissions
+            $cSt = $db->prepare("SELECT id, description, amount, type, commission_level, reference_tech_id, created_at FROM abd_commissions WHERE abd_id=? ORDER BY created_at DESC LIMIT 20");
+            $cSt->execute([$aid]);
+            $ins = $db->prepare("INSERT INTO abd_notifications (abd_id, type, title, message, is_read, created_at) VALUES (?,?,?,?,0,?)");
+            foreach ($cSt->fetchAll(PDO::FETCH_ASSOC) as $c) {
+                if ($c['type'] === 'credit') {
+                    $lvl   = (int)$c['commission_level'] > 1 ? 'indirect' : 'direct';
+                    $title = 'Commission credited — ₹' . number_format((float)$c['amount'], 2);
+                    $msg   = $c['description'] ?: ucfirst($lvl) . ' referral commission received';
+                    $type  = (int)$c['commission_level'] > 1 ? 'referral' : 'earning';
+                } else {
+                    $title = 'Withdrawal processed — ₹' . number_format((float)$c['amount'], 2);
+                    $msg   = $c['description'] ?: 'Wallet withdrawal completed';
+                    $type  = 'payment';
+                }
+                $ins->execute([$aid, $type, $title, $msg, $c['created_at']]);
+            }
+
+            // From technician registrations under this ABD
+            $tSt = $db->prepare("SELECT u.name, t.created_at FROM technicians t JOIN users u ON u.id=t.user_id WHERE t.abd_id=? ORDER BY t.created_at DESC LIMIT 10");
+            $tSt->execute([$aid]);
+            foreach ($tSt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+                $ins->execute([$aid, 'referral', 'New technician joined — ' . $t['name'], $t['name'] . ' registered under your referral network', $t['created_at']]);
+            }
+        }
+
+        $nSt = $db->prepare("SELECT id, type, title, message, is_read, created_at FROM abd_notifications WHERE abd_id=? ORDER BY created_at DESC LIMIT 50");
+        $nSt->execute([$aid]);
+        $notifs = array_map(function($n) {
+            return [
+                'id'         => (int)$n['id'],
+                'type'       => $n['type'],
+                'title'      => $n['title'],
+                'message'    => $n['message'],
+                'body'       => $n['message'],
+                'is_read'    => (bool)$n['is_read'],
+                'created_at' => date('d M, g:i A', strtotime($n['created_at'])),
+            ];
+        }, $nSt->fetchAll(PDO::FETCH_ASSOC));
+
+        $unread = count(array_filter($notifs, fn($n) => !$n['is_read']));
+        echo json_encode(['status' => 'success', 'notifications' => $notifs, 'unread_count' => $unread]);
         break;
 
     case 'complaints':

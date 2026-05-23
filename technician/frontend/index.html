@@ -6,7 +6,7 @@
 <title>Kwikar — Technician Panel</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="tech.css">
+<link rel="stylesheet" href="tech.css?v=20260524">
 </head>
 <body>
 
@@ -39,18 +39,18 @@
 
         <div class="hero">
           <div class="hero-name">Hello, Ravi 👋</div>
-          <div class="hero-sub">4 jobs scheduled today · Stay on top of your game</div>
+          <div class="hero-sub" id="heroSub">Loading…</div>
           <div class="hero-pills">
             <div class="hero-pill">
-              <div class="hpv">4.8 ★</div>
+              <div class="hpv" id="heroPillRating">—</div>
               <div class="hpl">Rating</div>
             </div>
             <div class="hero-pill">
-              <div class="hpv">127</div>
+              <div class="hpv" id="heroPillJobs">—</div>
               <div class="hpl">Jobs Done</div>
             </div>
             <div class="hero-pill">
-              <div class="hpv">Flex</div>
+              <div class="hpv" id="heroPillPlan">Flex</div>
               <div class="hpl">Active Plan</div>
             </div>
           </div>
@@ -59,30 +59,30 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--accent-dim);color:var(--accent);"><i class="fas fa-briefcase"></i></div>
-            <div class="stat-val">4</div>
+            <div class="stat-val" id="statJobsToday">—</div>
             <div class="stat-lbl">Jobs Today</div>
-            <div class="stat-trend" style="color:var(--accent);"><i class="fas fa-arrow-up"></i>2 vs yesterday</div>
+            <div class="stat-trend" style="color:var(--accent);"><i class="fas fa-arrow-up"></i><span id="statJobsTodaySub">—</span></div>
             <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,26 10,18 20,22 30,10 40,14 50,4 58,8" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-rupee-sign"></i></div>
-            <div class="stat-val">₹1,800</div>
+            <div class="stat-val" id="statTodayEarnings">—</div>
             <div class="stat-lbl">Today's Earnings</div>
-            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>12% vs avg</div>
+            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>Live</div>
             <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,24 10,20 20,16 30,20 40,12 50,8 58,4" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-coins"></i></div>
-            <div class="stat-val">₹28.4k</div>
+            <div class="stat-val" id="statMonthEarnings">—</div>
             <div class="stat-lbl">This Month</div>
-            <div class="stat-trend" style="color:var(--warn);"><i class="fas fa-arrow-up"></i>8% vs last</div>
+            <div class="stat-trend" style="color:var(--warn);"><i class="fas fa-arrow-up"></i>This month</div>
             <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,26 10,22 20,26 30,16 40,18 50,10 58,6" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--danger-dim);color:var(--danger);"><i class="fas fa-chart-pie"></i></div>
-            <div class="stat-val">94%</div>
+            <div class="stat-val" id="statCompletionRate">—</div>
             <div class="stat-lbl">Completion Rate</div>
-            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>Top rated</div>
+            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>All time</div>
             <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,18 10,16 20,20 30,12 40,10 50,8 58,6" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </div>
@@ -117,7 +117,7 @@
         <div class="card">
           <div class="card-hd">
             <h3>This Week's Earnings</h3>
-            <span class="chip chip-go">↑ 12%</span>
+            <span class="chip chip-go" id="dashWeekChip" style="display:none;"></span>
           </div>
           <div class="chart-wrap">
             <canvas id="dashChart"></canvas>
@@ -125,10 +125,10 @@
           <div class="month-goal">
             <div class="month-goal-hd">
               <span>Monthly Goal — ₹50,000</span>
-              <strong>57% reached</strong>
+              <strong id="monthGoalPct">—% reached</strong>
             </div>
             <div class="prog-bar">
-              <div class="prog-fill" style="width:57%;background:var(--accent);"></div>
+              <div class="prog-fill" id="monthGoalBar" style="width:0%;background:var(--accent);"></div>
             </div>
           </div>
         </div>
@@ -142,28 +142,29 @@
             <svg width="104" height="104" viewBox="0 0 104 104" style="flex-shrink:0;">
               <circle cx="52" cy="52" r="42" fill="none" stroke="#F0F0EC" stroke-width="13"/>
               <circle cx="52" cy="52" r="42" fill="none" stroke="var(--accent)" stroke-width="13"
+                id="perfRingCircle"
                 stroke-dasharray="263.9" stroke-dashoffset="15.8"
                 stroke-linecap="round" transform="rotate(-90 52 52)"
                 style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
-              <text x="52" y="48" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="17" font-weight="700" fill="#0D1B3E">94%</text>
+              <text x="52" y="48" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="17" font-weight="700" fill="#0D1B3E" id="perfRingText">—</text>
               <text x="52" y="63" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="#8892A4">Completion</text>
             </svg>
             <div class="ring-labels">
               <div class="ring-row">
                 <span class="rk" style="--c:var(--accent);">Completed</span>
-                <span class="rv">120 jobs</span>
+                <span class="rv" id="perfCompleted">—</span>
               </div>
               <div class="ring-row">
                 <span class="rk" style="--c:var(--warn);">Cancelled</span>
-                <span class="rv">5 jobs</span>
+                <span class="rv" id="perfCancelled">—</span>
               </div>
               <div class="ring-row">
-                <span class="rk" style="--c:var(--danger);">Rejected</span>
-                <span class="rv">2 jobs</span>
+                <span class="rk" style="--c:var(--danger);">Ongoing</span>
+                <span class="rv" id="perfOngoing">—</span>
               </div>
               <div class="ring-row">
-                <span class="rk" style="--c:var(--success);">Response Rate</span>
-                <span class="rv">98%</span>
+                <span class="rk" style="--c:var(--success);">Rating</span>
+                <span class="rv" id="perfRating">—</span>
               </div>
             </div>
           </div>
@@ -189,19 +190,19 @@
 
         <div class="balance-hero">
           <div class="bal-label">Available Balance</div>
-          <div class="bal-amount">₹12,300</div>
+          <div class="bal-amount" id="earnBalance">₹—</div>
           <div class="bal-row">
             <div class="bal-item">
               <div class="bi-lbl">This Month</div>
-              <div class="bi-val">₹28,450</div>
+              <div class="bi-val" id="earnMonth">₹—</div>
             </div>
             <div class="bal-item">
               <div class="bi-lbl">Pending</div>
-              <div class="bi-val">₹6,400</div>
+              <div class="bi-val" id="earnPending">₹—</div>
             </div>
             <div class="bal-item">
               <div class="bi-lbl">Withdrawn</div>
-              <div class="bi-val">₹45,000</div>
+              <div class="bi-val" id="earnWithdrawn">₹—</div>
             </div>
           </div>
           <button type="button" class="withdraw-btn" onclick="openWithdraw()">
@@ -212,12 +213,12 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-check-circle"></i></div>
-            <div class="stat-val">127</div>
+            <div class="stat-val" id="earnJobsCompleted">—</div>
             <div class="stat-lbl">Jobs Completed</div>
           </div>
           <div class="stat-card">
             <div class="stat-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-hourglass-half"></i></div>
-            <div class="stat-val">₹6,400</div>
+            <div class="stat-val" id="earnPendingPayout">₹—</div>
             <div class="stat-lbl">Pending Payout</div>
             <div class="stat-trend" style="color:var(--text-3);font-size:9px;">Paid on 31st</div>
           </div>
@@ -226,7 +227,7 @@
         <div class="card">
           <div class="card-hd">
             <h3>7-Day Earnings</h3>
-            <span class="chip chip-go">↑ 12% vs last week</span>
+            <span class="chip chip-go" id="earnWeekChip" style="display:none;"></span>
           </div>
           <div class="chart-wrap">
             <canvas id="earnChart"></canvas>
@@ -247,21 +248,21 @@
               <circle cx="55" cy="55" r="42" fill="none" stroke="var(--warn)" stroke-width="15"
                 stroke-dasharray="263.9" stroke-dashoffset="203.2"
                 stroke-linecap="round" transform="rotate(139 55 55)" opacity=".75"/>
-              <text x="55" y="51" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="13" font-weight="700" fill="#0D1B3E">₹28.4k</text>
+              <text x="55" y="51" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="13" font-weight="700" fill="#0D1B3E" id="earnRingText">₹—</text>
               <text x="55" y="65" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="#8892A4">Total</text>
             </svg>
             <div class="ring-labels">
               <div class="ring-row">
                 <span class="rk" style="--c:var(--accent);">Completed Jobs</span>
-                <span class="rv">₹22,050</span>
+                <span class="rv" id="earnBreakCompleted">₹—</span>
               </div>
               <div class="ring-row">
                 <span class="rk" style="--c:var(--warn);">Pending</span>
-                <span class="rv">₹6,400</span>
+                <span class="rv" id="earnBreakPending">₹—</span>
               </div>
               <div class="ring-row">
-                <span class="rk" style="--c:var(--danger);">Platform Fee</span>
-                <span class="rv">−₹2,980</span>
+                <span class="rk" style="--c:var(--danger);">Wallet Balance</span>
+                <span class="rv" id="earnBreakBalance">₹—</span>
               </div>
             </div>
           </div>
@@ -283,78 +284,78 @@
       <div class="sec-title">Your Plan</div>
       <p class="text-sm text-muted" style="margin-top:-10px;margin-bottom:14px;">Pick the model that fits how you work</p>
 
-      <div class="plan-card">
-        <div class="plan-badge pb-dark">📍 Fix Plan</div>
-        <div class="plan-price">₹499 <span>/ pincode</span></div>
-        <div class="plan-note">One-time charge — unlimited jobs in that area</div>
-        <div style="display:flex;gap:5px;margin:10px 0;">
-          <div style="flex:1;height:4px;border-radius:2px;background:var(--navy);"></div>
-          <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
-          <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
-          <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
-          <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
-        </div>
-        <p style="font-size:10px;color:var(--text-3);margin-bottom:10px;">1 of 5 pincodes unlocked</p>
-        <ul class="plan-feats">
-          <li><i class="fas fa-check"></i> Unlock a pincode area at ₹499</li>
-          <li><i class="fas fa-check"></i> Unlimited jobs in that pincode</li>
-          <li><i class="fas fa-check"></i> Add more pincodes at same rate</li>
-          <li><i class="fas fa-check"></i> No per-service charges after unlock</li>
-          <li><i class="fas fa-check"></i> Priority listing &amp; Verified badge</li>
-        </ul>
-        <div class="plan-hint">
-          <i class="fas fa-lightbulb" style="color:var(--warn);"></i>
-          Best for technicians with a steady local client base
-        </div>
-        <button type="button" class="btn btn-secondary" onclick="showSnack('Fix Plan selected — redirecting to payment')">Get Fix Plan</button>
-      </div>
+      <div class="plan-blur-wrap">
+        <!-- blurred content -->
+        <div class="plan-blur-content">
 
-      <div class="plan-card featured">
-        <div class="plan-badge pb-blue">⚡ Flex Plan — Recommended</div>
-        <div class="plan-price">₹0 <span>first 3 services</span></div>
-        <div class="plan-note">Then ₹149 per service · No area restrictions</div>
-        <div style="background:var(--accent-dim);border-radius:var(--r-s);padding:10px 12px;margin:10px 0;">
-          <div class="flex j-between" style="margin-bottom:5px;">
-            <span style="font-size:10px;color:var(--accent);font-weight:600;">Free Quota Used</span>
-            <span style="font-size:10px;color:var(--accent);font-weight:700;">3 / 3</span>
+          <div class="plan-card">
+            <div class="plan-badge pb-dark">📍 Fix Plan</div>
+            <div class="plan-price">₹499 <span>/ pincode</span></div>
+            <div class="plan-note">One-time charge — unlimited jobs in that area</div>
+            <div style="display:flex;gap:5px;margin:10px 0;">
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--navy);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+            </div>
+            <p style="font-size:10px;color:var(--text-3);margin-bottom:10px;">1 of 5 pincodes unlocked</p>
+            <ul class="plan-feats">
+              <li><i class="fas fa-check"></i> Unlock a pincode area at ₹499</li>
+              <li><i class="fas fa-check"></i> Unlimited jobs in that pincode</li>
+              <li><i class="fas fa-check"></i> Add more pincodes at same rate</li>
+              <li><i class="fas fa-check"></i> No per-service charges after unlock</li>
+              <li><i class="fas fa-check"></i> Priority listing &amp; Verified badge</li>
+            </ul>
+            <div class="plan-hint">
+              <i class="fas fa-lightbulb" style="color:var(--warn);"></i>
+              Best for technicians with a steady local client base
+            </div>
+            <button type="button" class="btn btn-secondary">Get Fix Plan</button>
           </div>
-          <div class="prog-bar">
-            <div class="prog-fill" style="width:100%;background:var(--accent);"></div>
-          </div>
-          <p style="font-size:9px;color:var(--accent);margin-top:4px;opacity:.7;">Free quota used — next job: ₹149</p>
-        </div>
-        <ul class="plan-feats">
-          <li><i class="fas fa-check"></i> First 3 services completely free</li>
-          <li><i class="fas fa-check"></i> ₹149 charged per service after quota</li>
-          <li><i class="fas fa-check"></i> Accept jobs from any pincode</li>
-          <li><i class="fas fa-check"></i> No upfront commitment needed</li>
-          <li><i class="fas fa-check"></i> Pay only when you do the work</li>
-        </ul>
-        <div class="plan-hint" style="background:var(--accent-dim);">
-          <i class="fas fa-lightbulb" style="color:var(--accent);"></i>
-          Best for new or part-time technicians — zero risk to start
-        </div>
-        <button type="button" class="btn btn-primary" onclick="showSnack('You are on Flex Plan ✓')">Active Plan</button>
-      </div>
 
-      <div class="card mb-0">
-        <div class="card-hd"><h3>Quick Comparison</h3></div>
-        <table style="width:100%;border-collapse:collapse;font-size:11px;">
-          <thead>
-            <tr style="border-bottom:2px solid var(--border);">
-              <th style="text-align:left;padding:7px 0;font-weight:500;color:var(--text-3);">Feature</th>
-              <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--navy);">Fix</th>
-              <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--accent);">Flex</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Pricing</td><td style="text-align:center;color:var(--navy);">₹499/area</td><td style="text-align:center;color:var(--accent);">₹149/job</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Free Quota</td><td style="text-align:center;color:var(--text-3);">—</td><td style="text-align:center;color:var(--success);">✓ 3 free</td></tr>
-            <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Job Limit</td><td style="text-align:center;">Unlimited</td><td style="text-align:center;">Unlimited</td></tr>
-            <tr><td style="padding:8px 0;color:var(--text-2);">Coverage</td><td style="text-align:center;">Paid areas</td><td style="text-align:center;color:var(--success);">Anywhere</td></tr>
-          </tbody>
-        </table>
-      </div>
+          <div class="plan-card featured">
+            <div class="plan-badge pb-blue">⚡ Flex Plan — Recommended</div>
+            <div class="plan-price">₹0 <span>first 3 services</span></div>
+            <div class="plan-note">Then ₹149 per service · No area restrictions</div>
+            <ul class="plan-feats">
+              <li><i class="fas fa-check"></i> First 3 services completely free</li>
+              <li><i class="fas fa-check"></i> ₹149 charged per service after quota</li>
+              <li><i class="fas fa-check"></i> Accept jobs from any pincode</li>
+              <li><i class="fas fa-check"></i> No upfront commitment needed</li>
+              <li><i class="fas fa-check"></i> Pay only when you do the work</li>
+            </ul>
+            <button type="button" class="btn btn-primary">Active Plan</button>
+          </div>
+
+          <div class="card mb-0">
+            <div class="card-hd"><h3>Quick Comparison</h3></div>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border);">
+                  <th style="text-align:left;padding:7px 0;font-weight:500;color:var(--text-3);">Feature</th>
+                  <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--navy);">Fix</th>
+                  <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--accent);">Flex</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Pricing</td><td style="text-align:center;color:var(--navy);">₹499/area</td><td style="text-align:center;color:var(--accent);">₹149/job</td></tr>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Free Quota</td><td style="text-align:center;color:var(--text-3);">—</td><td style="text-align:center;color:var(--success);">✓ 3 free</td></tr>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Job Limit</td><td style="text-align:center;">Unlimited</td><td style="text-align:center;">Unlimited</td></tr>
+                <tr><td style="padding:8px 0;color:var(--text-2);">Coverage</td><td style="text-align:center;">Paid areas</td><td style="text-align:center;color:var(--success);">Anywhere</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div><!-- end blur-content -->
+
+        <!-- overlay badge -->
+        <div class="plan-coming-soon">
+          <div class="plan-cs-icon">🚀</div>
+          <div class="plan-cs-title">Coming Soon</div>
+          <div class="plan-cs-sub">Plan management will be available in the next update</div>
+        </div>
+      </div><!-- end blur-wrap -->
     </div>
 
     <!-- ━━ NOTIFICATIONS ━━ -->
@@ -467,6 +468,16 @@
         </div>
       </div>
 
+      <div class="card logout-card" onclick="logout()">
+        <div class="sr-left">
+          <div class="sr-ico" style="background:rgba(220,38,38,.10);color:var(--danger);"><i class="fas fa-sign-out-alt"></i></div>
+          <div>
+            <div class="sr-title" style="color:var(--danger);">Logout</div>
+            <div class="sr-sub">Sign out of your account</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card danger-zone">
         <h4>Danger Zone</h4>
         <p class="text-xs text-muted" style="margin-bottom:10px;">These actions are permanent and cannot be undone.</p>
@@ -547,6 +558,6 @@
 
 <div class="snackbar" id="snackbar"></div>
 
-<script src="tech.js"></script>
+<script src="tech.js?v=20260524"></script>
 </body>
 </html>

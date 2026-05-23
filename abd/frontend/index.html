@@ -328,8 +328,8 @@
 
       /* Sliding marquee — bounces left then right */
       @keyframes greet-marquee {
-        0%,  22% { transform: translateX(0); }
-        78%, 100% { transform: translateX(-52px); }
+        0%,  20% { transform: translateX(0); }
+        75%, 100% { transform: translateX(calc(-1 * var(--greet-slide, 0px))); }
       }
 
       .abd-mobile-greeting-text {
@@ -338,7 +338,7 @@
         font-size: 12px;
         font-weight: 700;
         color: #475569;
-        animation: greet-marquee 3.5s ease-in-out infinite alternate;
+        animation: greet-marquee 3s ease-in-out infinite alternate;
       }
 
       .abd-navbar-dropdown {

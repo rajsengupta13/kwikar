@@ -153,10 +153,12 @@ function Sidebar({ activePage, onNavigate, collapsed, onToggle, mobileOpen = fal
 }
 
 // ── Navbar ────────────────────────────────────────────────────────────
-function Navbar({ activePage, onNavigate, notifCount = 4, onMenuOpen, session, onLogout }) {
+function Navbar({ activePage, onNavigate, notifCount = 0, notifItems = [], onNotifRead, onNotifReadAll, onMenuOpen, session, onLogout }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const greetClipRef = React.useRef(null);
+  const greetTextRef = React.useRef(null);
   const pageLabels = {
     "dashboard":"Dashboard", "direct-technicians":"Direct Technicians",
     "referral-technicians":"Referral Technicians","auto-joined":"Auto Joined Technicians",
@@ -179,6 +181,19 @@ function Navbar({ activePage, onNavigate, notifCount = 4, onMenuOpen, session, o
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const avatarImage = session?.profile_image || session?.avatar || '';
+
+  // Measure real text overflow → set CSS variable for the marquee slide distance
+  React.useEffect(() => {
+    const clip = greetClipRef.current;
+    const text = greetTextRef.current;
+    if (!clip || !text) return;
+    const overflow = text.scrollWidth - clip.clientWidth;
+    if (overflow > 0) {
+      text.style.setProperty('--greet-slide', overflow + 4 + 'px');
+    } else {
+      text.style.setProperty('--greet-slide', '0px');
+    }
+  }, [greeting, firstName]);
 
   return (
     <div style={{
@@ -228,8 +243,8 @@ function Navbar({ activePage, onNavigate, notifCount = 4, onMenuOpen, session, o
         <span className="abd-mobile-avatar">
           {avatarImage ? <img src={avatarImage} alt="" /> : <span>{(initials || firstName[0] || 'A').slice(0, 2)}</span>}
         </span>
-        <span className="abd-mobile-greeting-clip">
-          <span className="abd-mobile-greeting-text">{greeting}, {firstName}!</span>
+        <span className="abd-mobile-greeting-clip" ref={greetClipRef}>
+          <span className="abd-mobile-greeting-text" ref={greetTextRef}>{greeting}, {firstName}!</span>
         </span>
       </button>
       <div className="abd-navbar-notif" style={{ position:"relative" }}>
@@ -257,20 +272,22 @@ function Navbar({ activePage, onNavigate, notifCount = 4, onMenuOpen, session, o
               <span style={{ fontWeight:800, fontSize:14 }}>Notifications</span>
               <span style={{ fontSize:11, color:"#ff5a1f", cursor:"pointer", fontWeight:600 }} onClick={()=>{ onNavigate("notifications"); setNotifOpen(false); }}>View all →</span>
             </div>
-            {(window.KD?.notifications||[]).slice(0,4).map(n=>(
-              <div key={n.id} style={{
+            {notifItems.length === 0
+              ? <div style={{ padding:"20px 18px", textAlign:"center", color:"#94a3b8", fontSize:12 }}>No notifications yet</div>
+              : notifItems.slice(0,4).map(n=>(
+              <div key={n.id} onClick={()=>{ if(!n.is_read && onNotifRead) onNotifRead(n.id); window.abdApi('notifications',{action:'mark_read',id:n.id}).catch(()=>{}); }} style={{
                 padding:"12px 18px", borderBottom:"1px solid #f8fafc",
-                background: n.read?"#fff":"#fffbf9",
+                background: n.is_read?"#fff":"#fffbf9",
                 display:"flex", gap:10, cursor:"pointer"
               }}>
                 <div style={{
-                  width:8, height:8, borderRadius:"50%", background: n.read?"#e2e8f0":"#ff5a1f",
+                  width:8, height:8, borderRadius:"50%", background: n.is_read?"#e2e8f0":"#ff5a1f",
                   flexShrink:0, marginTop:4
                 }}/>
                 <div>
                   <div style={{ fontSize:12, fontWeight:700, color:"#0f172a" }}>{n.title}</div>
-                  <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{n.body}</div>
-                  <div style={{ fontSize:10, color:"#94a3b8", marginTop:3 }}>{n.time}</div>
+                  <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{n.message||n.body}</div>
+                  <div style={{ fontSize:10, color:"#94a3b8", marginTop:3 }}>{n.created_at}</div>
                 </div>
               </div>
             ))}

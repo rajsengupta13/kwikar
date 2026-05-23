@@ -1,0 +1,6 @@
+[2026-05-23 11:10:54] [INFO] User logged in | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=login
+[2026-05-23 11:15:25] [INFO] Booking created | {"booking_id":1,"booking_code":"349A815D","user_id":15,"phone":"9534862453","service":"washing","pincode":"812006","broadcasts":1} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-23 11:38:23] [INFO] Technician registered | {"phone":"6205531392","user_id":27,"tech_id":13,"abd_id":0} | IP:::1 POST /mono-kwikar//backend/booking_api.php
+[2026-05-23 11:44:11] [INFO] Pincode checked | {"pincode":"812006","available":true} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-23 11:44:22] [INFO] User logged in | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=login
+[2026-05-23 11:44:34] [INFO] Booking created | {"booking_id":2,"booking_code":"68779272","user_id":15,"phone":"9534862453","service":"ac","pincode":"812006","broadcasts":2} | IP:::1 POST /mono-kwikar/backend/booking_api.php

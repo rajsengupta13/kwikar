@@ -1,5 +1,4 @@
-sql
-CREATE DATABASE kwikar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS kwikar CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE kwikar;
 
 -- =========================================================
@@ -958,6 +957,76 @@ CREATE TABLE system_settings (
     setting_key VARCHAR(150) NOT NULL UNIQUE,
 
     setting_value TEXT NOT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- =========================================================
+-- ADMINS
+-- =========================================================
+
+CREATE TABLE admins (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+    user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+
+    is_super TINYINT(1) DEFAULT 0,
+
+    FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- =========================================================
+-- ADMIN AUDIT LOGS
+-- =========================================================
+
+CREATE TABLE admin_audit_logs (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+    admin_id BIGINT UNSIGNED NOT NULL,
+
+    action VARCHAR(255) NOT NULL,
+
+    target_type VARCHAR(100) NULL,
+
+    target_id BIGINT UNSIGNED NULL,
+
+    details JSON NULL,
+
+    ip_address VARCHAR(45) NULL,
+
+    FOREIGN KEY (admin_id)
+    REFERENCES admins(id)
+    ON DELETE CASCADE,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =========================================================
+-- USER SETTINGS
+-- =========================================================
+
+CREATE TABLE user_settings (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+
+    user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+
+    notifications_enabled TINYINT(1) DEFAULT 1,
+
+    language VARCHAR(10) DEFAULT 'en',
+
+    theme ENUM('light', 'dark', 'system') DEFAULT 'system',
+
+    FOREIGN KEY (user_id)
+    REFERENCES users(id)
+    ON DELETE CASCADE,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

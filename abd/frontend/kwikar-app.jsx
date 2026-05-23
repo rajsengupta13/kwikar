@@ -297,6 +297,8 @@ function App() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notifItems, setNotifItems] = useState([]);
+  const [notifCount, setNotifCount] = useState(0);
   const pageRef = React.useRef("dashboard");
 
   // Check existing session on mount — also handles autologin redirect from registration
@@ -372,6 +374,19 @@ function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  function fetchNotifications() {
+    window.abdApi('notifications').then(res => {
+      if (res.status === 'success') {
+        setNotifItems(res.notifications || []);
+        setNotifCount(res.unread_count ?? (res.notifications || []).filter(n => !n.is_read).length);
+      }
+    }).catch(() => {});
+  }
+
+  React.useEffect(() => {
+    if (session) fetchNotifications();
+  }, [session]);
+
   function handleLogin(abd) {
     setSession(abd);
     window.ABD_SESSION = abd;
@@ -407,6 +422,7 @@ function App() {
 
   function navigate(nextPage) {
     if (nextPage === _navPage) return;
+    if (_navPage === 'notifications') fetchNotifications();
     if (nextPage === 'dashboard') {
       _navStack = [];
     } else {
@@ -429,7 +445,7 @@ function App() {
       <Sidebar activePage={page} onNavigate={navigate} collapsed={mobileNavOpen ? false : collapsed} onToggle={()=>setCollapsed(c=>!c)} mobileOpen={mobileNavOpen} onMobileClose={()=>setMobileNavOpen(false)} session={session}/>
       {mobileNavOpen && <div className="abd-sidebar-backdrop" onClick={()=>setMobileNavOpen(false)}/>}
       <div className="abd-main" style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, overflow:"hidden" }}>
-        <Navbar activePage={page} onNavigate={navigate} notifCount={4} onMenuOpen={()=>setMobileNavOpen(true)} session={session} onLogout={handleLogout}/>
+        <Navbar activePage={page} onNavigate={navigate} notifCount={notifCount} notifItems={notifItems} onNotifRead={(id)=>{ setNotifCount(c=>Math.max(0,c-1)); setNotifItems(p=>p.map(n=>n.id===id?{...n,is_read:true}:n)); }} onNotifReadAll={()=>{ setNotifCount(0); setNotifItems(p=>p.map(n=>({...n,is_read:true}))); }} onMenuOpen={()=>setMobileNavOpen(true)} session={session} onLogout={handleLogout}/>
         <div className="abd-scroll" style={{ flex:1, overflowY:"auto" }}>
           <PageComponent/>
         </div>

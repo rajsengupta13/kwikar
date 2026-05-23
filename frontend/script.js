@@ -1,5 +1,8 @@
-// Dynamic base path — works on both localhost (/mono-kwikar) and live root (/)
-const _BASE = window.location.pathname.replace(/\/frontend\/.*$/, '');
+// Dynamic base path — works on localhost (/mono-kwikar) and live root (/)
+const _BASE = window.location.pathname
+  .replace(/\/frontend\/.*$/, '')   // strip /frontend/...
+  .replace(/\/[^/]*\.html$/, '')    // strip /filename.html if no /frontend/
+  .replace(/\/$/, '');              // strip trailing slash so /+/path never becomes //path
 
 /* ══════════ WELCOME MODAL ══════════ */
 (function(){
@@ -324,14 +327,23 @@ function isSlotExpired(b){
 }
 
 function openBkDetail(b){
-  const status=b.status||'pending';
-  const isPending=status==='pending';
-  const isConfirmed=status==='confirmed'||status==='completed';
+  const status=b.status||'new';
+  const isPending=['new','broadcasted','pending'].includes(status);
+  const isAccepted=['accepted','assigned','arrived','ongoing','completed'].includes(status);
   const isCancelled=status==='cancelled';
   const expired=isPending&&isSlotExpired(b);
   const canCancel=isPending&&!expired;
 
-  const techBlock = isConfirmed && b.technician_name ? `
+  const statusLabel={
+    new:'Pending — Waiting for Technician',broadcasted:'Pending — Waiting for Technician',
+    pending:'Pending — Waiting for Technician',accepted:'Confirmed — Technician is on the way',
+    assigned:'Confirmed — Technician Assigned',arrived:'Technician Arrived',
+    ongoing:'Work in Progress',completed:'Completed'
+  }[status]||status;
+
+  const statusColor=isAccepted?'#16a34a':isPending?'#f59e0b':'#64748b';
+
+  const techBlock = isAccepted && b.technician_name ? `
     <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px 14px;margin:10px 0">
       <div style="font-size:.7rem;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">✅ Technician Assigned</div>
       <div class="bk-detail-row" style="margin-bottom:4px"><span>👷</span><span style="font-weight:800;color:#0d1b3e">${b.technician_name}</span></div>
@@ -343,7 +355,7 @@ function openBkDetail(b){
     <div class="bk-detail-issue">${b.issue}${b.other_issue?' — '+b.other_issue:''}</div>
     ${isCancelled
       ? `<div class="bk-cancelled-note">❌ Yeh booking cancel ho chuki hai</div>`
-      : isConfirmed
+      : isAccepted
         ? techBlock
         : expired
           ?`<div class="bk-sorry"><div class="bk-sorry-emoji">😔</div><div class="bk-sorry-title">Koi technician nahi mila!</div><div class="bk-sorry-sub">Selected time slot mein koi technician available nahi tha. Kya aap dobara schedule karna chahte hain?</div><button class="bk-reschedule-btn" onclick="closeBkDetail();window.location.href='booking.html?service=${encodeURIComponent(b.service)}'">🔄 Reschedule Karo</button></div>`
@@ -351,7 +363,7 @@ function openBkDetail(b){
     }
     ${b.slot_time?`<div class="bk-detail-row"><span>⏰</span><span>${b.slot_time}</span></div>`:''}
     ${b.slot_date?`<div class="bk-detail-row"><span>📅</span><span>${b.slot_date}</span></div>`:''}
-    ${!expired&&!isCancelled?`<div class="bk-detail-row"><span>📌</span><span style="color:${isConfirmed?'#16a34a':isPending?'#f59e0b':'#64748b'};font-weight:800">${isConfirmed?'Confirmed':'Pending — Waiting for Technician'}</span></div>`:''}
+    ${!expired&&!isCancelled?`<div class="bk-detail-row"><span>📌</span><span style="color:${statusColor};font-weight:800">${statusLabel}</span></div>`:''}
     ${canCancel?`<button type="button" class="bk-cancel-btn" id="bkCancelBtn" onclick="cancelBooking(${b.id})">❌ Booking Cancel Karo</button>`:''}
   `;
   document.getElementById('bkDetailOverlay').classList.add('show');
@@ -439,20 +451,22 @@ let _pendingRole=null;
 
 function selectRoleCard(role){
   _pendingRole=role;
-  document.getElementById('lrcCardUser').classList.toggle('lrc-selected',role==='user');
-  document.getElementById('lrcCardTech').classList.toggle('lrc-selected',role==='tech');
-  document.getElementById('lrcCardAbd').classList.toggle('lrc-selected',role==='abd');
+  const userCard=document.getElementById('lrcCardUser');
+  const techCard=document.getElementById('lrcCardTech');
+  if(userCard) userCard.classList.toggle('lrc-selected',role==='user');
+  if(techCard) techCard.classList.toggle('lrc-selected',role==='tech');
   const btn=document.getElementById('lrcContinueBtn');
-  btn.classList.add('lrc-active');
-  const labels={'user':'Login as Customer','tech':'Login as Technician','abd':'Login as ABD'};
-  document.getElementById('lrcBtnText').textContent=labels[role]||'Continue';
+  if(btn){ btn.classList.add('lrc-active'); }
+  const labels={'user':'Login as Customer','tech':'Login as Technician','abd':'Login as ABD','admin':'Login as Admin'};
+  const btnText=document.getElementById('lrcBtnText');
+  if(btnText) btnText.textContent=labels[role]||'Continue';
 }
 function confirmRoleSelect(){
   if(_pendingRole)selectRole(_pendingRole);
 }
 
 function _showOnly(id){
-  ['loginRoleView','loginPhoneView','loginPinView','loginRegStep1','loginRegStep2','loginRegStep3','loginTechRegView','abdRegView']
+  ['loginRoleView','loginPhoneView','loginPinView','loginRegStep1','loginRegStep2','loginRegStep3','loginTechRegView','abdRegView','loginAdminView']
     .forEach(v=>{const el=document.getElementById(v);if(el)el.style.display=v===id?'':'none';});
   document.getElementById('loginBox').classList.toggle('scrollable',id==='loginTechRegView'||id==='loginRegStep2'||id==='abdRegView');
 }
@@ -461,22 +475,37 @@ function openLoginModal(){
   _loginRole='user';
   _pendingRole=null;
   _showOnly('loginRoleView');
-  // reset card state
-  document.getElementById('lrcCardUser').classList.remove('lrc-selected');
-  document.getElementById('lrcCardTech').classList.remove('lrc-selected');
-  document.getElementById('lrcCardAbd').classList.remove('lrc-selected');
+  const userCard=document.getElementById('lrcCardUser');
+  const techCard=document.getElementById('lrcCardTech');
+  if(userCard) userCard.classList.remove('lrc-selected');
+  if(techCard) techCard.classList.remove('lrc-selected');
   const btn=document.getElementById('lrcContinueBtn');
-  btn.classList.remove('lrc-active');
-  document.getElementById('lrcBtnText').textContent='Continue';
+  if(btn){ btn.classList.remove('lrc-active'); }
+  const btnText=document.getElementById('lrcBtnText');
+  if(btnText) btnText.textContent='Continue';
   document.getElementById('loginOverlay').classList.add('show');
 }
 function closeLoginModal(){
   document.getElementById('loginOverlay').classList.remove('show');
   document.getElementById('loginBox').classList.remove('scrollable');
 }
+function openLoginAs(role){
+  openLoginModal();
+  selectRoleCard(role);
+  confirmRoleSelect();
+}
 
 function selectRole(role){
   _loginRole=role;
+  if(role==='admin'){
+    _showOnly('loginAdminView');
+    const em=document.getElementById('adminEmail');
+    if(em){em.value='';em.focus();}
+    const pe=document.getElementById('adminPassword');
+    if(pe) pe.value='';
+    document.getElementById('adminLoginErr').textContent='';
+    return;
+  }
   _showOnly('loginPhoneView');
   document.getElementById('loginPhoneOnly').value='';
   document.getElementById('loginPhoneErr').textContent='';
@@ -503,6 +532,89 @@ function selectRole(role){
 }
 
 function switchToRoleSelect(){_showOnly('loginRoleView');}
+
+/* ── Admin Auth ─────────────────────────────────────────────────── */
+function switchAdminTab(tab){
+  const isLogin = tab === 'login';
+  document.getElementById('adminTabLogin').classList.toggle('active', isLogin);
+  document.getElementById('adminTabReg').classList.toggle('active', !isLogin);
+  document.getElementById('adminLoginForm').style.display = isLogin ? '' : 'none';
+  document.getElementById('adminRegForm').style.display  = isLogin ? 'none' : '';
+  document.getElementById('adminLoginErr').textContent = '';
+  document.getElementById('adminRegErr').textContent   = '';
+}
+
+async function submitAdminLogin(){
+  const email = (document.getElementById('adminEmail')?.value || '').trim();
+  const pin   = (document.getElementById('adminPin')?.value   || '').trim();
+  const errEl = document.getElementById('adminLoginErr');
+  const btn   = document.getElementById('adminLoginBtn');
+
+  errEl.textContent = '';
+  if (!email || !pin) { errEl.textContent = 'Email aur PIN required hai'; return; }
+  if (!/^\d{4,6}$/.test(pin)) { errEl.textContent = 'PIN 4-6 digits ka hona chahiye'; return; }
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Logging in…';
+  try {
+    const res  = await fetch(_BASE + '/admin/backend/api/api.php?module=login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      credentials:'include', body:JSON.stringify({email, pin})
+    });
+    const data = await res.json();
+    if (data.success) {
+      try { localStorage.setItem('kw_admin', JSON.stringify(data.admin)); } catch(_) {}
+      closeLoginModal();
+      window.location.href = _BASE + '/admin/frontend/';
+    } else {
+      errEl.textContent = data.error || 'Login failed';
+    }
+  } catch(e) {
+    errEl.textContent = 'Server error: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+async function submitAdminRegister(){
+  const name  = (document.getElementById('adminRegName')?.value  || '').trim();
+  const email = (document.getElementById('adminRegEmail')?.value  || '').trim();
+  const pin   = (document.getElementById('adminRegPin')?.value    || '').trim();
+  const errEl = document.getElementById('adminRegErr');
+  const btn   = document.getElementById('adminRegBtn');
+
+  errEl.textContent = '';
+  if (!name || !email || !pin) { errEl.textContent = 'Sabhi fields required hain'; return; }
+  if (!/^\d{4,6}$/.test(pin)) { errEl.textContent = 'PIN 4-6 digits ka hona chahiye'; return; }
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Creating account…';
+  try {
+    const url = _BASE + '/admin/backend/api/api.php?module=register';
+    const res  = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      credentials:'include', body:JSON.stringify({name, email, pin})
+    });
+    const text = await res.text(); // get raw text first
+    console.log('Admin register response [' + res.status + ']:', text);
+    let data;
+    try { data = JSON.parse(text); }
+    catch(_) { errEl.textContent = 'Server returned invalid response (status '+res.status+'). Check browser console.'; return; }
+    if (data.success) {
+      try { localStorage.setItem('kw_admin', JSON.stringify(data.admin)); } catch(_) {}
+      closeLoginModal();
+      window.location.href = _BASE + '/admin/frontend/';
+    } else {
+      errEl.textContent = data.error || 'Registration failed';
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
 
 function switchToRegister(){
   const ph=document.getElementById('loginPhoneOnly').value.trim();
@@ -1859,7 +1971,7 @@ async function pollBookingStatus(){
     json.bookings.forEach(b=>{
       const prev=_lastBookingStatuses[b.id];
       // Only beep after first poll (so we don't beep on page load for already-confirmed bookings)
-      if(_bookingPollReady && prev && prev!=='confirmed' && b.status==='confirmed'){
+      if(_bookingPollReady && prev && ['new','broadcasted','pending'].includes(prev) && ['accepted','assigned','arrived','ongoing'].includes(b.status)){
         playBookingAcceptedBeep();
         const techLine = b.technician_name
           ? ` 👷 ${b.technician_name}${b.technician_phone ? ' · 📞 '+b.technician_phone : ''}`
@@ -1877,5 +1989,5 @@ async function pollBookingStatus(){
   const u=localStorage.getItem('kwikar_user');
   if(!u) return;
   pollBookingStatus(); // populate baseline statuses
-  setInterval(pollBookingStatus,30000); // check every 30s
+  setInterval(pollBookingStatus,10000); // check every 10s
 })();
