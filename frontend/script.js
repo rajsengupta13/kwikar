@@ -124,9 +124,15 @@ function _heroVideoPlay(){
   if(!v)return;
   v.currentTime=0;
   v.muted=true;
+  v.volume=0;
   v.play().then(()=>{
+    v.muted=true;
+    v.volume=0;
     document.getElementById('svpOverlay').style.display='none';
     document.getElementById('svpControls').style.display='';
+    // Show muted icon — video starts silent
+    document.getElementById('svpUnmuteIcon').style.display='none';
+    document.getElementById('svpMutedIcon').style.display='';
     v.onended=()=>{ goSlide(cur+1); };
   }).catch(()=>{
     document.getElementById('svpOverlay').style.display='';
@@ -153,6 +159,7 @@ function heroVideoMuteToggle(){
   const v=document.getElementById('heroVideo');
   if(!v)return;
   v.muted=!v.muted;
+  if(!v.muted)v.volume=1;
   document.getElementById('svpUnmuteIcon').style.display=v.muted?'none':'';
   document.getElementById('svpMutedIcon').style.display=v.muted?'':'none';
 }
