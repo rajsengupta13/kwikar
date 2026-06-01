@@ -122,16 +122,11 @@ function _heroVideoPause(){
 function _heroVideoPlay(){
   const v=document.getElementById('heroVideo');
   if(!v)return;
+  v.pause();
   v.currentTime=0;
   v.muted=true;
-  v.play().then(()=>{
-    document.getElementById('svpOverlay').style.display='none';
-    document.getElementById('svpControls').style.display='';
-    v.onended=()=>{ goSlide(cur+1); };
-  }).catch(()=>{
-    document.getElementById('svpOverlay').style.display='';
-    document.getElementById('svpControls').style.display='none';
-  });
+  document.getElementById('svpOverlay').style.display='';
+  document.getElementById('svpControls').style.display='none';
 }
 function heroVideoStart(){
   // User tap — play with sound, hide big overlay, show controls
