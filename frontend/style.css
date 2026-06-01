@@ -1191,7 +1191,7 @@ body.modal-open{overflow:hidden}
     box-shadow:none;
     isolation:isolate;
   }
-  .carousel-slide img{object-fit:contain;background:#0d1b3e;transform:none!important;}
+  .carousel-slide img{object-fit:cover;object-position:center;transform:none!important;}
 
   /* TECHNICIAN MODAL — fullscreen on mobile */
   .tech-modal{padding:0;align-items:stretch}
