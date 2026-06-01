@@ -1,306 +1,471 @@
-// kwikar-tree.jsx — Interactive Referral Network Tree
-const { useState, useEffect, useRef, useCallback, useMemo } = React;
+// kwikar-tree.jsx — Admin Referral Network Tree (matches ABD panel design)
+const { useState, useEffect, useMemo, useCallback } = React;
 
-const NW = 180, NH = 80, LGAP = 240, RGAP = 26;
+const UNIT_W   = 210;
+const LEVEL_H  = 190;
+const NODE_W   = 186;
+const NODE_H   = 108;
 
-function buildLayout(node, depth, yRef, exp) {
-  const result = { ...node, depth, x: depth * LGAP, children_laid: [], collapsed: false };
-  const open = exp.has(node.id) && node.children && node.children.length > 0;
-  if (open) {
-    const laid = node.children.map(c => buildLayout(c, depth + 1, yRef, exp));
-    result.children_laid = laid;
-    result.y = (laid[0].y + laid[laid.length - 1].y) / 2;
-  } else {
-    result.collapsed = (node.children && node.children.length > 0);
-    result.y = yRef.y;
-    yRef.y += NH + RGAP;
+// depth 0 = Super Admin, depth 1 = ABD, depth 2+ = Technician levels
+const LEVEL_COLORS = {
+  0: { bg:"linear-gradient(135deg,#0f172a,#1e3a5f)", text:"#fff", border:"#22d3ee", badge:"Super Admin" },
+  1: { bg:"linear-gradient(135deg,#ff5a1f,#ff8c00)", text:"#fff", border:"#ff5a1f", badge:"ABD" },
+  2: { bg:"#fff", text:"#0f172a", border:"#ff5a1f", badge:"L1 Direct" },
+  3: { bg:"#fff", text:"#0f172a", border:"#3b82f6", badge:"L2 Referral" },
+  4: { bg:"#fff", text:"#0f172a", border:"#8b5cf6", badge:"L3 Referral" },
+  5: { bg:"#fff", text:"#0f172a", border:"#10b981", badge:"L4+" },
+};
+const LEVEL_LINE_COLOR = { 1:"#22d3ee", 2:"#ff5a1f", 3:"#3b82f6", 4:"#8b5cf6", 5:"#10b981" };
+const AVATAR_COLORS = ["#ff5a1f","#3b82f6","#10b981","#8b5cf6","#f59e0b","#ef4444","#06b6d4","#ec4899","#22d3ee"];
+
+function getAvatarColor(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xfffff;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+
+function getInitials(name) {
+  return (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function subtreeWidth(node, expanded) {
+  if (!node.children?.length || !expanded.has(node.id)) return 1;
+  return Math.max(1, node.children.reduce((s, c) => s + subtreeWidth(c, expanded), 0));
+}
+
+function getMaxDepth(node, expanded, depth = 0) {
+  if (!node.children?.length || !expanded.has(node.id)) return depth;
+  return Math.max(...node.children.map(c => getMaxDepth(c, expanded, depth + 1)));
+}
+
+function layoutTree(root, expanded) {
+  const nodes = [], edges = [];
+
+  function walk(node, depth, leftSlot) {
+    const sw   = subtreeWidth(node, expanded);
+    const cx   = (leftSlot + sw / 2) * UNIT_W;
+    const cy   = depth * LEVEL_H + 20;
+    const hasChildren = node.children?.length > 0;
+    const isExpanded  = expanded.has(node.id);
+
+    nodes.push({ ...node, cx, cy, sw, hasChildren, isExpanded, depth, children: undefined });
+
+    if (hasChildren && isExpanded) {
+      let slot = leftSlot;
+      for (const child of node.children) {
+        const cw      = subtreeWidth(child, expanded);
+        const childCX = (slot + cw / 2) * UNIT_W;
+        const childCY = (depth + 1) * LEVEL_H + 20;
+        edges.push({
+          id: `e-${node.id}-${child.id}`,
+          x1: cx,      y1: cy   + NODE_H / 2 + 2,
+          x2: childCX, y2: childCY - NODE_H / 2 - 2,
+          level: Math.min(depth + 1, 5),
+          direct: depth === 0 || depth === 1,
+        });
+        walk(child, depth + 1, slot);
+        slot += cw;
+      }
+    }
   }
-  return result;
+
+  walk(root, 0, 0);
+  const maxSW = subtreeWidth(root, expanded);
+  return {
+    nodes, edges,
+    width:  Math.max(maxSW * UNIT_W, 700),
+    height: getMaxDepth(root, expanded) * LEVEL_H + NODE_H + 80,
+  };
 }
 
-function flatNodes(node) {
-  return [node, ...(node.children_laid || []).flatMap(flatNodes)];
+function getStyleIndex(node) {
+  if (node.role === 'admin') return 0;
+  if (node.role === 'abd')   return 1;
+  // Technicians: depth 1 (orphan, no ABD) and depth 2 (direct under ABD) both = L1 Direct
+  // depth 3 = L2 Referral, depth 4 = L3, etc.
+  return Math.min(Math.max(2, node.depth), 5);
 }
 
-function getEdges(node) {
-  return (node.children_laid || []).flatMap(c => [{ from: node, to: c }, ...getEdges(c)]);
-}
-
-function nodeStyle(node) {
-  if (node.role === 'admin')    return { bg:'rgba(34,211,238,.1)',   border:'rgba(34,211,238,.45)',  accent:'#22D3EE', glow:'rgba(34,211,238,.25)' };
-  if (node.role === 'abd')      return { bg:'rgba(167,139,250,.1)',  border:'rgba(167,139,250,.4)',  accent:'#A78BFA', glow:'rgba(167,139,250,.2)' };
-  if (node.status === 'suspended') return { bg:'rgba(248,113,113,.1)', border:'rgba(248,113,113,.4)', accent:'#F87171', glow:'rgba(248,113,113,.18)' };
-  if (node.status === 'inactive' || node.status === 'offline') return { bg:'rgba(255,255,255,.03)', border:'rgba(255,255,255,.1)', accent:'#44475A', glow:'none' };
-  if (node.status === 'pending') return { bg:'rgba(251,191,36,.08)',  border:'rgba(251,191,36,.35)',  accent:'#FBBF24', glow:'rgba(251,191,36,.15)' };
-  return { bg:'rgba(52,211,153,.07)', border:'rgba(52,211,153,.32)', accent:'#34D399', glow:'rgba(52,211,153,.15)' };
-}
-
-function TreeNode({ node, isSelected, onSelect, onToggle }) {
-  const [hov, setHov] = useState(false);
-  const ns = nodeStyle(node);
-  const hasKids = (node.children && node.children.length > 0) || node.collapsed;
+function TreeNode({ node, onToggle, hoveredId, onHover }) {
+  const styleIdx   = getStyleIndex(node);
+  const lc         = LEVEL_COLORS[styleIdx];
+  const isHovered  = hoveredId === node.id;
+  const isRoot     = node.role === 'admin';
+  const isABD      = node.role === 'abd';
+  const isSpecial  = isRoot || isABD;
+  const badgeColor = styleIdx === 0 ? "#22d3ee" : styleIdx === 1 ? "#ff5a1f" : styleIdx === 2 ? "#ff5a1f" : styleIdx === 3 ? "#3b82f6" : "#8b5cf6";
+  const statusColor = node.status === "active" ? "#10b981" : node.status === "blocked" || node.status === "suspended" ? "#ef4444" : "#94a3b8";
 
   return (
     <div
-      style={{ position:'absolute', left:node.x, top:node.y, width:NW, height:NH, background:isSelected?'rgba(34,211,238,.16)':hov?ns.bg:ns.bg, border:`1.5px solid ${isSelected?'#22D3EE':ns.border}`, borderRadius:12, padding:'9px 11px', cursor:'pointer', display:'flex', alignItems:'center', gap:9, boxShadow:isSelected?`0 0 22px ${ns.glow}`:hov?'0 4px 20px rgba(0,0,0,.4)':'0 2px 8px rgba(0,0,0,.25)', transition:'all .18s ease', userSelect:'none' }}
-      onClick={() => onSelect(node)}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-    >
-      <Avatar name={node.name} size={34} online={node.status === 'active'}/>
-      <div style={{ flex:1, minWidth:0 }}>
-        <div style={{ fontSize:12.5, fontWeight:600, color:'#E5E7F0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{node.name}</div>
-        <div style={{ fontSize:10.5, color:ns.accent, fontWeight:500, marginTop:1.5 }}>
-          {node.role === 'admin' ? 'Super Admin' : node.role === 'abd' ? `ABD · ${node.city}` : node.cat || 'Technician'}
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:4 }}>
-          <span className="kbadge" style={{ background:`${ns.accent}20`, color:ns.accent, fontSize:9.5, padding:'1px 6px' }}>{node.status}</span>
-          {node.earnings > 0 && <span style={{ fontSize:10, color:'#34D399', fontWeight:500 }}>{fCur(node.earnings)}</span>}
-          {node.refs > 0 && <span style={{ fontSize:10, color:'#8B8FA8' }}>↳{node.refs}</span>}
-        </div>
-      </div>
-      {hasKids && (
-        <button
-          style={{ width:20, height:20, borderRadius:5, background:'rgba(255,255,255,.1)', border:'1px solid rgba(255,255,255,.14)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, cursor:'pointer' }}
-          onClick={e => { e.stopPropagation(); onToggle(node.id); }}
-          onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,.2)'}
-          onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,.1)'}
-        >
-          <Ico n={node.children_laid && node.children_laid.length > 0 ? 'chevDown' : 'chevRight'} s={10} c="#8B8FA8"/>
-        </button>
-      )}
-    </div>
-  );
-}
+      onMouseEnter={() => onHover(node.id)}
+      onMouseLeave={() => onHover(null)}
+      onClick={() => node.hasChildren && onToggle(node.id)}
+      style={{
+        position: "absolute",
+        left: node.cx - NODE_W / 2,
+        top:  node.cy - NODE_H / 2,
+        width: NODE_W, height: NODE_H,
+        borderRadius: 14,
+        background: isSpecial ? lc.bg : "#fff",
+        border: isSpecial ? "none" : `2px solid ${isHovered ? lc.border : "#e8edf2"}`,
+        borderLeft: isSpecial ? "none" : `4px solid ${lc.border}`,
+        boxShadow: isHovered
+          ? `0 12px 32px rgba(0,0,0,0.14), 0 0 0 2px ${lc.border}40`
+          : "0 3px 12px rgba(0,0,0,0.07)",
+        cursor: node.hasChildren ? "pointer" : "default",
+        transition: "all 0.2s ease",
+        transform: isHovered ? "translateY(-3px) scale(1.02)" : "none",
+        zIndex: isHovered ? 10 : 1,
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        padding: "10px 14px", gap: 4, userSelect: "none",
+      }}>
 
-function NodePopup({ node, onClose }) {
-  const ns = nodeStyle(node);
-  const roleLabel = node.role === 'admin' ? 'Super Admin' : node.role === 'abd' ? 'Area Business Director' : 'Technician';
-  return (
-    <div style={{ position:'absolute', top:70, right:16, width:280, zIndex:20 }} className="fade-up">
-      <div style={{ background:'#0D0E16', border:`1px solid ${ns.border}`, borderRadius:14, overflow:'hidden', boxShadow:`0 20px 60px rgba(0,0,0,.6), 0 0 30px ${ns.glow}` }}>
-        <div style={{ background:ns.bg, padding:'16px', display:'flex', alignItems:'center', gap:12, borderBottom:'1px solid rgba(255,255,255,.07)' }}>
-          <Avatar name={node.name} size={44} online={node.status === 'active'}/>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontFamily:'Space Grotesk', fontSize:15, fontWeight:700, color:'#E5E7F0' }}>{node.name}</div>
-            <div style={{ fontSize:11.5, color:ns.accent, marginTop:2 }}>{roleLabel}</div>
-          </div>
-          <button onClick={onClose} style={{ background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.12)', borderRadius:6, width:24, height:24, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Ico n="x" s={12} c="#8B8FA8"/>
-          </button>
+      {/* Top row: avatar + name + expand toggle */}
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <div style={{
+          width: 34, height: 34, borderRadius:"50%", flexShrink:0,
+          background: isSpecial ? "rgba(255,255,255,0.25)" : getAvatarColor(node.id),
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize: 11, fontWeight: 800, color:"#fff",
+          border: isSpecial ? "2px solid rgba(255,255,255,0.4)" : "none",
+          position:"relative",
+        }}>
+          {getInitials(node.name)}
+          <div style={{
+            position:"absolute", bottom:-1, right:-1, width:10, height:10,
+            borderRadius:"50%", background:statusColor, border:"1.5px solid #fff",
+          }}/>
         </div>
-        <div style={{ padding:'14px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:12 }}>
-            {[
-              { l:'Status', v:node.status, c:ns.accent },
-              { l:'Plan', v:node.plan, c:'#A78BFA' },
-              { l:'Earnings', v:node.earnings > 0 ? fCur(node.earnings) : '₹0', c:'#34D399' },
-              { l:'Referrals', v:node.refs, c:'#22D3EE' },
-              ...(node.city ? [{ l:'City', v:node.city, c:'#E5E7F0' }] : []),
-              ...(node.cat  ? [{ l:'Category', v:node.cat,  c:'#E5E7F0' }] : []),
-            ].map(m => (
-              <div key={m.l} style={{ padding:'9px 11px', background:'rgba(255,255,255,.04)', borderRadius:8 }}>
-                <div style={{ fontSize:10, color:'#44475A', marginBottom:3, textTransform:'uppercase', letterSpacing:'.04em' }}>{m.l}</div>
-                <div style={{ fontSize:13, fontWeight:600, color:m.c }}>{m.v}</div>
-              </div>
-            ))}
-          </div>
-          {node.status === 'suspended' && (
-            <div style={{ padding:'8px 12px', background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', borderRadius:8, fontSize:11.5, color:'#F87171', marginBottom:10, display:'flex', gap:6, alignItems:'center' }}>
-              <Ico n="alertCircle" s={13} c="#F87171"/>⚠ Account suspended — referral chain at risk
-            </div>
-          )}
-          {node.status === 'pending' && (
-            <div style={{ padding:'8px 12px', background:'rgba(251,191,36,.08)', border:'1px solid rgba(251,191,36,.3)', borderRadius:8, fontSize:11.5, color:'#FBBF24', marginBottom:10, display:'flex', gap:6, alignItems:'center' }}>
-              <Ico n="clock" s={13} c="#FBBF24"/>KYC pending — limited platform access
-            </div>
-          )}
-          <div style={{ display:'flex', gap:6 }}>
-            <button className="kbtn p" style={{ flex:1, justifyContent:'center', fontSize:11.5 }}><Ico n="eye" s={12}/>View Profile</button>
-            <button className="kbtn" style={{ flex:1, justifyContent:'center', fontSize:11.5 }}><Ico n="flag" s={12}/>Flag Node</button>
+
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{
+            fontSize: 12.5, fontWeight: 800,
+            color: isSpecial ? "#fff" : "#0f172a",
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+          }}>{node.name}</div>
+          <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:2 }}>
+            <span style={{
+              fontSize: 9.5, fontWeight: 700, padding:"1px 6px", borderRadius:10,
+              background: isSpecial ? "rgba(255,255,255,0.2)" : badgeColor + "18",
+              color: isSpecial ? "#fff" : badgeColor,
+            }}>{lc.badge}</span>
+            {(isABD && node.city) && (
+              <span style={{ fontSize:9.5, color: isSpecial ? "rgba(255,255,255,0.7)" : "#94a3b8" }}>· {node.city}</span>
+            )}
+            {(!isSpecial && node.cat) && (
+              <span style={{ fontSize:9.5, color:"#94a3b8", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:90 }}>· {node.cat}</span>
+            )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function MiniMap({ nodes, pan, scale, treeW, treeH, containerW, containerH }) {
-  const MW = 150, MH = 90;
-  const sx = MW / Math.max(treeW, 1), sy = MH / Math.max(treeH, 1);
-  const vpW = Math.min(MW, (containerW / scale) * sx);
-  const vpH = Math.min(MH, (containerH / scale) * sy);
-  const vpX = Math.max(0, (-pan.x / scale) * sx);
-  const vpY = Math.max(0, (-pan.y / scale) * sy);
-  return (
-    <div style={{ position:'absolute', bottom:16, right:16, zIndex:10, background:'rgba(13,14,22,.9)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, padding:'10px', backdropFilter:'blur(12px)' }}>
-      <div style={{ fontSize:9.5, color:'#44475A', marginBottom:6, letterSpacing:'.08em', textTransform:'uppercase' }}>Network Map</div>
-      <div style={{ position:'relative', width:MW, height:MH, background:'rgba(255,255,255,.02)', borderRadius:6, overflow:'hidden' }}>
-        {nodes.map(n => {
-          const ns = nodeStyle(n);
-          return <div key={n.id} style={{ position:'absolute', left:n.x*sx, top:n.y*sy, width:NW*sx, height:NH*sy, background:ns.accent, borderRadius:2, opacity:.6 }}/>;
-        })}
-        <div style={{ position:'absolute', left:vpX, top:vpY, width:vpW, height:vpH, border:'1px solid rgba(34,211,238,.7)', borderRadius:3, background:'rgba(34,211,238,.05)', pointerEvents:'none' }}/>
+        {node.hasChildren && (
+          <div style={{
+            width:20, height:20, borderRadius:"50%", flexShrink:0,
+            background: isSpecial ? "rgba(255,255,255,0.2)" : "#f1f5f9",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            color: isSpecial ? "#fff" : "#94a3b8",
+          }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8">
+              {node.isExpanded
+                ? <polyline points="2,3.5 5,6.5 8,3.5"/>
+                : <polyline points="3.5,2 6.5,5 3.5,8"/>
+              }
+            </svg>
+          </div>
+        )}
       </div>
-    </div>
-  );
-}
 
-function TreeSearch({ nodes, onFocus }) {
-  const [q, setQ] = useState('');
-  const results = q.length > 1 ? nodes.filter(n => n.name.toLowerCase().includes(q.toLowerCase())).slice(0,5) : [];
-  return (
-    <div style={{ position:'relative', width:220 }}>
-      <div style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)' }}><Ico n="search" s={13} c="#44475A"/></div>
-      <input className="kinput" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search network…" style={{ paddingLeft:32, height:34, fontSize:12.5 }}/>
-      {results.length > 0 && (
-        <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, width:'100%', background:'#0D0E16', border:'1px solid rgba(255,255,255,.1)', borderRadius:9, overflow:'hidden', zIndex:20, boxShadow:'0 8px 32px rgba(0,0,0,.5)' }}>
-          {results.map(n=>(
-            <div key={n.id} style={{ padding:'9px 12px', display:'flex', alignItems:'center', gap:8, cursor:'pointer', borderBottom:'1px solid rgba(255,255,255,.05)' }}
-              onClick={()=>{ onFocus(n); setQ(''); }}
-              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.04)'}
-              onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-              <Avatar name={n.name} size={22}/>
-              <div>
-                <div style={{ fontSize:12, fontWeight:500, color:'#E5E7F0' }}>{n.name}</div>
-                <div style={{ fontSize:10.5, color:'#8B8FA8' }}>{n.role} · {n.status}</div>
-              </div>
-            </div>
-          ))}
+      {/* Bottom row: earnings + refs */}
+      <div style={{
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        marginTop:2, padding:"5px 0 0",
+        borderTop:`1px solid ${isSpecial ? "rgba(255,255,255,0.15)" : "#f1f5f9"}`,
+      }}>
+        <div>
+          <div style={{ fontSize:9, fontWeight:600, color: isSpecial ? "rgba(255,255,255,0.6)" : "#94a3b8", textTransform:"uppercase", letterSpacing:"0.04em" }}>
+            {isRoot ? "Network" : "Earnings"}
+          </div>
+          <div style={{ fontSize:12, fontWeight:800, color: isSpecial ? "#fff" : "#0f172a" }}>
+            {isRoot ? `${node.refs} Techs` : isABD ? `${node.refs} Techs` : `₹${Number(node.earnings / 1000).toFixed(1)}K`}
+          </div>
         </div>
-      )}
+        <div style={{ textAlign:"right" }}>
+          <div style={{ fontSize:9, fontWeight:600, color: isSpecial ? "rgba(255,255,255,0.6)" : "#94a3b8", textTransform:"uppercase", letterSpacing:"0.04em" }}>
+            {isRoot ? "ABDs" : isABD ? "Direct" : "Referrals"}
+          </div>
+          <div style={{ fontSize:12, fontWeight:800, color: isSpecial ? "#fff" : lc.border }}>
+            {isRoot ? (node.abd_count ?? node.children?.length ?? 0) : (node.refs || 0)}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ReferralTreePage() {
-  const ALL_IDS = ['root','abd1','abd2','abd3','t1','t2','t4','t5','t7'];
-  const [exp, setExp] = useState(new Set(['root','abd1','abd2','abd3']));
-  const [pan, setPan] = useState({ x:40, y:40 });
-  const [scale, setScale] = useState(0.82);
-  const [sel, setSel] = useState(null);
-  const [dragState, setDragState] = useState(null);
-  const containerRef = useRef(null);
+function NodeDetailCard({ node, onClose }) {
+  if (!node || node.depth === 0) return null;
+  const depth     = Math.min(node.depth, 5);
+  const lc        = LEVEL_COLORS[depth];
+  const badgeColor = depth === 1 ? "#ff5a1f" : depth === 2 ? "#ff5a1f" : depth === 3 ? "#3b82f6" : "#8b5cf6";
 
-  const layout = useMemo(() => {
-    const yRef = { y: 0 };
-    return buildLayout(KTREE, 0, yRef, exp);
-  }, [exp]);
+  return (
+    <div style={{
+      position:"fixed", right:32, bottom:32, width:288,
+      background:"#fff", borderRadius:16,
+      boxShadow:"0 24px 64px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.08)",
+      border:`2px solid ${lc.border}`, padding:20, zIndex:500,
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
+        <div style={{
+          width:44, height:44, borderRadius:"50%", background:getAvatarColor(node.id),
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:15, fontWeight:800, color:"#fff",
+        }}>{getInitials(node.name)}</div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:15, fontWeight:800, color:"#0f172a" }}>{node.name}</div>
+          <div style={{ fontSize:12, color:"#64748b" }}>{node.cat || (node.role === 'abd' ? 'ABD' : 'Technician')}</div>
+        </div>
+        <span style={{
+          padding:"3px 10px", borderRadius:20,
+          background: badgeColor + "18", color:badgeColor, fontSize:10, fontWeight:700,
+        }}>{lc.badge}</span>
+        <button onClick={onClose} style={{
+          width:24, height:24, borderRadius:"50%", border:"1px solid #e2e8f0",
+          background:"#f8fafc", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:14, color:"#94a3b8",
+        }}>×</button>
+      </div>
 
-  const nodes = useMemo(() => flatNodes(layout), [layout]);
-  const edges = useMemo(() => getEdges(layout),  [layout]);
-  const treeW = Math.max(...nodes.map(n=>n.x)) + NW + 80;
-  const treeH = Math.max(...nodes.map(n=>n.y)) + NH + 80;
+      {[
+        { label:"Total Earnings",  value:`₹${Number(node.earnings).toLocaleString("en-IN")}`, color:"#0f172a" },
+        { label:"Referrals Made",  value: String(node.refs || 0), color:lc.border },
+        { label:"Status",          value: node.status === "active" ? "🟢 Active" : node.status === "blocked" ? "🔴 Blocked" : "⚫ Inactive", color:"#0f172a" },
+        { label:"Network Level",   value:`Level ${node.depth}`, color:badgeColor },
+        ...(node.city ? [{ label:"City", value:node.city, color:"#64748b" }] : []),
+        ...(node.cat  ? [{ label:"Category", value:node.cat, color:"#64748b" }] : []),
+      ].map(row => (
+        <div key={row.label} style={{ display:"flex", justifyContent:"space-between", padding:"7px 0", borderBottom:"1px solid #f1f5f9" }}>
+          <span style={{ fontSize:12, color:"#64748b" }}>{row.label}</span>
+          <span style={{ fontSize:12, fontWeight:700, color:row.color }}>{row.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  const handleWheel = useCallback(e => {
-    e.preventDefault();
-    setScale(s => Math.max(0.25, Math.min(2.2, s - e.deltaY * 0.0008)));
-  }, []);
+function TreeLegend() {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+      {[
+        { color:"linear-gradient(135deg,#0f172a,#1e3a5f)", label:"Super Admin" },
+        { color:"linear-gradient(135deg,#ff5a1f,#ff8c00)", label:"ABD" },
+        { color:"#ff5a1f",  label:"L1 Direct" },
+        { color:"#3b82f6",  label:"L2 Referral" },
+        { color:"#8b5cf6",  label:"L3 Referral" },
+      ].map(item => (
+        <div key={item.label} style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ width:12, height:12, borderRadius:3, background:item.color, flexShrink:0 }}/>
+          <span style={{ fontSize:12, color:"#64748b" }}>{item.label}</span>
+        </div>
+      ))}
+      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+        <div style={{ width:20, height:2, background:"#22d3ee" }}/>
+        <span style={{ fontSize:12, color:"#64748b" }}>Direct link</span>
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+        <div style={{ width:20, height:2, borderTop:"2px dashed #3b82f6" }}/>
+        <span style={{ fontSize:12, color:"#64748b" }}>Referral link</span>
+      </div>
+    </div>
+  );
+}
 
-  const handleMD = useCallback(e => {
-    if (e.target.closest('button') || e.button !== 0) return;
-    setDragState({ sx:e.clientX, sy:e.clientY, ox:pan.x, oy:pan.y });
-  }, [pan]);
+function ReferralTree({ data }) {
+  const [expanded, setExpanded] = useState(() => {
+    const s = new Set();
+    function addAll(n) { s.add(n.id); n.children?.forEach(addAll); }
+    addAll(data);
+    return s;
+  });
+  const [hoveredId, setHoveredId] = useState(null);
+  const [zoom, setZoom]           = useState(1);
 
-  const handleMM = useCallback(e => {
-    if (!dragState) return;
-    setPan({ x: dragState.ox + e.clientX - dragState.sx, y: dragState.oy + e.clientY - dragState.sy });
-  }, [dragState]);
-
-  const handleMU = useCallback(() => setDragState(null), []);
+  const networkStats = useMemo(() => {
+    // Use pre-computed counts from API when available; fallback to tree walk
+    const totalAbds    = data.abd_count     ?? (data.children || []).filter(c => c.role === 'abd').length;
+    const directTechs  = data.direct_count  ?? 0;
+    const indirectTechs= data.indirect_count?? 0;
+    const totalTechs   = data.refs          ?? (directTechs + indirectTechs);
+    const maxD = getMaxDepth(data, expanded);
+    return { totalAbds, totalTechs, directTechs, indirectTechs, depth: Math.max(0, maxD - 1) };
+  }, [data, expanded]);
 
   const toggleNode = useCallback(id => {
-    setExp(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }, []);
 
-  const focusNode = useCallback(node => {
-    setSel(node);
-    const cw = containerRef.current?.clientWidth || 800;
-    const ch = containerRef.current?.clientHeight || 600;
-    setPan({ x: cw/2 - (node.x + NW/2)*scale, y: ch/2 - (node.y + NH/2)*scale });
-  }, [scale]);
-
-  const containerW = containerRef.current?.clientWidth  || 900;
-  const containerH = containerRef.current?.clientHeight || 600;
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (el) el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => { if (el) el.removeEventListener('wheel', handleWheel); };
-  }, [handleWheel]);
+  const { nodes, edges, width, height } = useMemo(() => layoutTree(data, expanded), [data, expanded]);
+  const hoveredNode = hoveredId ? nodes.find(n => n.id === hoveredId) : null;
 
   return (
-    <div style={{ height:'100%', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-      <div style={{ background:'rgba(10,11,18,.85)', backdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,.07)', padding:'10px 20px', display:'flex', alignItems:'center', gap:10, flexShrink:0, flexWrap:'wrap' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginRight:'auto' }}>
-          <div style={{ fontFamily:'Space Grotesk', fontSize:14, fontWeight:600 }}>Referral Network</div>
-          <span style={{ fontSize:12, color:'#8B8FA8' }}>{nodes.length} nodes · {edges.length} connections</span>
-        </div>
-        <TreeSearch nodes={nodes} onFocus={focusNode}/>
-        <div style={{ display:'flex', gap:6 }}>
-          <button className="kbtn" style={{ padding:'5px 10px' }} onClick={()=>setScale(s=>Math.min(2.2,s+0.12))}><Ico n="plus" s={13}/></button>
-          <button className="kbtn" style={{ padding:'5px 10px' }} onClick={()=>setScale(s=>Math.max(0.25,s-0.12))}><Ico n="x" s={13}/></button>
-          <button className="kbtn" onClick={()=>{ setScale(0.82); setPan({x:40,y:40}); }}>Reset View</button>
-          <button className="kbtn" onClick={()=>setExp(new Set(ALL_IDS))}><Ico n="chevDown" s={13}/>Expand All</button>
-          <button className="kbtn" onClick={()=>setExp(new Set(['root']))}><Ico n="chevRight" s={13}/>Collapse</button>
-        </div>
-        <div style={{ display:'flex', gap:10, marginLeft:4 }}>
-          {[{c:'#22D3EE',l:'Super Admin'},{c:'#A78BFA',l:'ABD'},{c:'#34D399',l:'Active Tech'},{c:'#F87171',l:'Suspended'}].map(m=>(
-            <div key={m.l} style={{ display:'flex', alignItems:'center', gap:5 }}>
-              <div style={{ width:8, height:8, borderRadius:'50%', background:m.c }}/>
-              <span style={{ fontSize:11, color:'#8B8FA8' }}>{m.l}</span>
-            </div>
+    <div>
+      {/* Legend + zoom controls */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16, flexWrap:"wrap", gap:12 }}>
+        <TreeLegend/>
+        <div style={{ display:"flex", gap:8 }}>
+          {[
+            { label:"+",     action:()=>setZoom(z=>Math.min(1.5,z+0.1)) },
+            { label:"−",     action:()=>setZoom(z=>Math.max(0.4,z-0.1)) },
+            { label:"Reset", action:()=>setZoom(1) },
+          ].map(b=>(
+            <button key={b.label} onClick={b.action} style={{
+              height:32, padding:"0 12px", borderRadius:8, border:"1px solid #e2e8f0",
+              background:"#fff", cursor:"pointer", fontSize: b.label.length===1?16:12,
+              fontWeight:600, color:"#64748b", minWidth:32,
+              display:"flex", alignItems:"center", justifyContent:"center",
+            }}>{b.label}</button>
           ))}
+          <button onClick={()=>{
+            const s=new Set(); function addAll(n){s.add(n.id);n.children?.forEach(addAll);} addAll(data);
+            setExpanded(s);
+          }} style={{ height:32, padding:"0 12px", borderRadius:8, border:"1px solid #e2e8f0", background:"#fff", cursor:"pointer", fontSize:12, fontWeight:600, color:"#64748b" }}>
+            Expand All
+          </button>
+          <button onClick={()=>setExpanded(new Set(["root"]))} style={{ height:32, padding:"0 12px", borderRadius:8, border:"1px solid #e2e8f0", background:"#fff", cursor:"pointer", fontSize:12, fontWeight:600, color:"#64748b" }}>
+            Collapse
+          </button>
         </div>
       </div>
 
-      <div ref={containerRef} style={{ flex:1, position:'relative', overflow:'hidden', cursor:dragState?'grabbing':'grab', background:'radial-gradient(ellipse at 30% 40%, rgba(34,211,238,.03) 0%, transparent 60%), var(--bg)' }}
-        onMouseDown={handleMD} onMouseMove={handleMM} onMouseUp={handleMU} onMouseLeave={handleMU}>
-        <svg style={{ position:'absolute', inset:0, pointerEvents:'none', opacity:.4 }} width="100%" height="100%">
-          <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <circle cx="20" cy="20" r="0.8" fill="rgba(255,255,255,.12)"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)"/>
-        </svg>
-
-        <div style={{ transform:`translate(${pan.x}px,${pan.y}px) scale(${scale})`, transformOrigin:'0 0', position:'relative', width:treeW, height:treeH }}>
-          <svg style={{ position:'absolute', inset:0, overflow:'visible', pointerEvents:'none' }} width={treeW} height={treeH}>
+      {/* Tree canvas */}
+      <div style={{
+        overflow:"auto", background:"#f8f9fc", borderRadius:16, border:"1px solid #e8edf2",
+        padding:24, maxHeight:"calc(100vh - 340px)",
+      }}>
+        <div style={{
+          position:"relative",
+          width: width * zoom, height: height * zoom,
+          transform:`scale(${zoom})`, transformOrigin:"top left",
+          minWidth: width,
+        }}>
+          <svg style={{ position:"absolute", top:0, left:0, width, height, pointerEvents:"none", overflow:"visible" }}>
             <defs>
-              <linearGradient id="edgeGrad1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="rgba(34,211,238,.55)"/><stop offset="100%" stopColor="rgba(167,139,250,.55)"/></linearGradient>
-              <linearGradient id="edgeGrad2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stopColor="rgba(167,139,250,.55)"/><stop offset="100%" stopColor="rgba(52,211,153,.55)"/></linearGradient>
-              <filter id="lineGlow"><feGaussianBlur stdDeviation="1.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              {Object.entries(LEVEL_LINE_COLOR).map(([level, color]) => (
+                <marker key={level} id={`adm-arrow-${level}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                  <polygon points="0 0, 8 3, 0 6" fill={color} opacity="0.5"/>
+                </marker>
+              ))}
             </defs>
-            {edges.map((e,i) => {
-              const x1=e.from.x+NW, y1=e.from.y+NH/2, x2=e.to.x, y2=e.to.y+NH/2, cx=(x1+x2)/2;
-              const sus = e.to.status==='suspended'||e.to.status==='inactive';
+            {edges.map(e => {
+              const color = LEVEL_LINE_COLOR[e.level] || "#94a3b8";
+              const my    = (e.y1 + e.y2) / 2;
               return (
-                <path key={i}
-                  d={`M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`}
-                  fill="none"
-                  stroke={sus?'rgba(248,113,113,.35)':`url(#edgeGrad1)`}
-                  strokeWidth={sus?1.2:1.8}
-                  strokeDasharray={sus?'5,4':'none'}
-                  filter={sus?'none':'url(#lineGlow)'}
-                  opacity={sus?0.6:0.85}
-                />
+                <g key={e.id}>
+                  <path
+                    d={`M${e.x1},${e.y1} C${e.x1},${my} ${e.x2},${my} ${e.x2},${e.y2}`}
+                    fill="none" stroke={color}
+                    strokeWidth={e.direct ? 2.5 : 1.5}
+                    strokeDasharray={e.direct ? "none" : "6,4"}
+                    opacity={0.55}
+                    markerEnd={`url(#adm-arrow-${e.level})`}
+                  />
+                  <path id={`adm-flow-${e.id}`}
+                    d={`M${e.x1},${e.y1} C${e.x1},${my} ${e.x2},${my} ${e.x2},${e.y2}`}
+                    fill="none" stroke="none"/>
+                  <circle r="3" fill={color} opacity="0.7">
+                    <animateMotion dur={e.direct?"2.5s":"3.8s"} repeatCount="indefinite">
+                      <mpath xlinkHref={`#adm-flow-${e.id}`}/>
+                    </animateMotion>
+                  </circle>
+                </g>
               );
             })}
           </svg>
 
           {nodes.map(node => (
-            <TreeNode key={node.id} node={node} isSelected={sel?.id===node.id} onSelect={setSel} onToggle={toggleNode}/>
+            <TreeNode key={node.id} node={node} onToggle={toggleNode} hoveredId={hoveredId} onHover={setHoveredId}/>
           ))}
         </div>
       </div>
 
-      {sel && <NodePopup node={sel} onClose={()=>setSel(null)}/>}
-      <MiniMap nodes={nodes} pan={pan} scale={scale} treeW={treeW} treeH={treeH} containerW={containerW} containerH={containerH}/>
-
-      <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', background:'rgba(13,14,22,.8)', border:'1px solid rgba(255,255,255,.1)', borderRadius:20, padding:'4px 14px', fontSize:11.5, color:'#8B8FA8', pointerEvents:'none', backdropFilter:'blur(8px)' }}>
-        {Math.round(scale*100)}% · Scroll to zoom · Drag to pan
+      {/* Stats bar */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginTop:16 }}>
+        {[
+          { label:"Total ABDs",       value: String(networkStats.totalAbds),    color:"#ff5a1f" },
+          { label:"Total Technicians",value: String(networkStats.totalTechs),   color:"#ff5a1f" },
+          { label:"Direct (L1)",      value: String(networkStats.directTechs),  color:"#3b82f6" },
+          { label:"Indirect (L2+)",   value: String(networkStats.indirectTechs),color:"#8b5cf6" },
+        ].map(s => (
+          <div key={s.label} style={{
+            background:"#fff", borderRadius:12, padding:"14px 18px",
+            boxShadow:"0 2px 8px rgba(0,0,0,0.05)", border:"1px solid #e8edf2",
+            borderTop:`3px solid ${s.color}`,
+          }}>
+            <div style={{ fontSize:11, color:"#94a3b8", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em" }}>{s.label}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:s.color, marginTop:4 }}>{s.value}</div>
+          </div>
+        ))}
       </div>
+
+      {hoveredNode && <NodeDetailCard node={hoveredNode} onClose={()=>setHoveredId(null)}/>}
+    </div>
+  );
+}
+
+function ReferralTreePage() {
+  const [treeData, setTreeData] = useState(null);
+  const [loading, setLoading]   = useState(true);
+
+  useEffect(() => {
+    window.adminApi('referral_tree').then(res => {
+      if (res.status === 'success' && res.tree) setTreeData(res.tree);
+    }).catch(()=>{}).finally(()=>setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div style={{ padding:"28px 32px", color:"#64748b", fontSize:14 }}>Loading referral network...</div>
+  );
+
+  // Use pre-computed totals from API: abd_count + refs (assigned techs)
+  const totalAbds  = treeData?.abd_count ?? 0;
+  const totalTechs = treeData?.refs      ?? 0;
+  const totalNodes = totalAbds + totalTechs;
+
+  return (
+    <div style={{ padding:"28px 32px", animation:"fadeIn 0.25s ease", background:"#f1f5f9", minHeight:"100%" }}>
+      {/* Header */}
+      <div style={{ marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <h2 style={{ fontSize:20, fontWeight:800, color:"#0f172a", margin:"0 0 4px" }}>Referral Network</h2>
+          <p style={{ fontSize:13, color:"#64748b", margin:0 }}>
+            {totalAbds > 0
+              ? `${totalAbds} ABD${totalAbds !== 1 ? 's' : ''} · ${totalTechs} technician${totalTechs !== 1 ? 's' : ''} — click nodes to expand/collapse.`
+              : 'No referral data yet. ABDs and technicians will appear here once registered.'}
+          </p>
+        </div>
+        <div style={{ display:"flex", gap:12 }}>
+          <div style={{ padding:"10px 18px", borderRadius:12, background:"rgba(167,139,250,0.08)", border:"1px solid rgba(167,139,250,0.2)" }}>
+            <div style={{ fontSize:11, color:"#a78bfa", fontWeight:600 }}>ABDs</div>
+            <div style={{ fontSize:18, fontWeight:800, color:"#a78bfa" }}>{totalAbds}</div>
+          </div>
+          <div style={{ padding:"10px 18px", borderRadius:12, background:"rgba(52,211,153,0.08)", border:"1px solid rgba(52,211,153,0.2)" }}>
+            <div style={{ fontSize:11, color:"#34d399", fontWeight:600 }}>Technicians</div>
+            <div style={{ fontSize:18, fontWeight:800, color:"#34d399" }}>{totalTechs}</div>
+          </div>
+        </div>
+      </div>
+
+      {!treeData || totalAbds === 0
+        ? <div style={{ background:"#fff", borderRadius:16, border:"1px solid #e8edf2", padding:"60px 32px", textAlign:"center", color:"#94a3b8", fontSize:14 }}>
+            No ABDs registered yet. Add ABDs from the ABD Management page to build the referral network.
+          </div>
+        : <ReferralTree data={treeData}/>
+      }
     </div>
   );
 }

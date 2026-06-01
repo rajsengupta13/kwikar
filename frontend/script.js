@@ -109,15 +109,71 @@ const _BASE = window.location.pathname
 })();
 
 /* ══════════ CAROUSEL ══════════ */
-let cur=0,total=3,timer;
+let cur=0,total=4,timer;
 const track=document.getElementById('carouselTrack');
 const slides=document.querySelectorAll('.carousel-slide');
 const dots=document.querySelectorAll('.dot-btn');
-function goSlide(n){slides[cur].classList.remove('active');dots[cur].classList.remove('active');cur=(n+total)%total;slides[cur].classList.add('active');dots[cur].classList.add('active');track.style.transform=`translateX(-${cur*100}%)`;resetTimer()}
+const VIDEO_SLIDE=1; // index of the video slide
+
+function _heroVideoPause(){
+  const v=document.getElementById('heroVideo');
+  if(v&&!v.paused){ v.pause(); }
+}
+function _heroVideoPlay(){
+  const v=document.getElementById('heroVideo');
+  if(!v)return;
+  v.currentTime=0;
+  v.muted=true;
+  v.play().then(()=>{
+    document.getElementById('svpOverlay').style.display='none';
+    document.getElementById('svpControls').style.display='';
+    v.onended=()=>{ goSlide(cur+1); };
+  }).catch(()=>{
+    document.getElementById('svpOverlay').style.display='';
+    document.getElementById('svpControls').style.display='none';
+  });
+}
+function heroVideoStart(){
+  // User tap — play with sound, hide big overlay, show controls
+  const v=document.getElementById('heroVideo');
+  if(!v)return;
+  v.muted=false;
+  v.play().then(()=>{
+    document.getElementById('svpOverlay').style.display='none';
+    document.getElementById('svpControls').style.display='';
+    clearInterval(timer);
+    v.onended=()=>{ goSlide(cur+1); };
+  }).catch(()=>{});
+}
+function heroVideoPause(){
+  const v=document.getElementById('heroVideo');
+  if(v){ v.pause(); document.getElementById('svpControls').style.display='none'; document.getElementById('svpOverlay').style.display=''; resetTimer(); }
+}
+function heroVideoMuteToggle(){
+  const v=document.getElementById('heroVideo');
+  if(!v)return;
+  v.muted=!v.muted;
+  document.getElementById('svpUnmuteIcon').style.display=v.muted?'none':'';
+  document.getElementById('svpMutedIcon').style.display=v.muted?'':'none';
+}
+
+function goSlide(n){
+  slides[cur].classList.remove('active');
+  dots[cur].classList.remove('active');
+  _heroVideoPause();
+  cur=(n+total)%total;
+  slides[cur].classList.add('active');
+  dots[cur].classList.add('active');
+  track.style.transform=`translateX(-${cur*100}%)`;
+  if(cur===VIDEO_SLIDE){ _heroVideoPlay(); clearInterval(timer); }
+  else resetTimer();
+}
 function nextSlide(){goSlide(cur+1)}
 function prevSlide(){goSlide(cur-1)}
-function resetTimer(){clearInterval(timer);timer=setInterval(nextSlide,5500)}
-resetTimer();
+function resetTimer(){clearInterval(timer);timer=setInterval(()=>{if(cur!==VIDEO_SLIDE)nextSlide();},5500)}
+
+// Start on video slide
+goSlide(VIDEO_SLIDE);
 
 /* ══════════ TOUCH SWIPE ══════════ */
 let ts=0;
@@ -128,11 +184,12 @@ track.addEventListener('touchend',e=>{const d=e.changedTouches[0].clientX-ts;if(
 const LAUNCH=new Date('2026-05-26T00:00:00');
 function tick(){
   const diff=LAUNCH-new Date();
-  if(diff<=0){['d-days','d-hrs','d-min','d-sec'].forEach(i=>document.getElementById(i).textContent='00');return}
-  document.getElementById('d-days').textContent=String(Math.floor(diff/86400000)).padStart(2,'0');
-  document.getElementById('d-hrs').textContent=String(Math.floor(diff%86400000/3600000)).padStart(2,'0');
-  document.getElementById('d-min').textContent=String(Math.floor(diff%3600000/60000)).padStart(2,'0');
-  document.getElementById('d-sec').textContent=String(Math.floor(diff%60000/1000)).padStart(2,'0');
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  if(diff<=0){['d-days','d-hrs','d-min','d-sec'].forEach(i=>set(i,'00'));return}
+  set('d-days',String(Math.floor(diff/86400000)).padStart(2,'0'));
+  set('d-hrs',String(Math.floor(diff%86400000/3600000)).padStart(2,'0'));
+  set('d-min',String(Math.floor(diff%3600000/60000)).padStart(2,'0'));
+  set('d-sec',String(Math.floor(diff%60000/1000)).padStart(2,'0'));
 }
 tick();setInterval(tick,1000);
 
@@ -282,9 +339,60 @@ function openProfModal(){
   const u=JSON.parse(localStorage.getItem('kwikar_user')||'{}');
   document.getElementById('profName').textContent=u.name||'';
   document.getElementById('profPhone').textContent=u.phone||'';
+  const addrParts=[u.address,u.city,u.pincode].filter(Boolean);
+  document.getElementById('profAddress').textContent=addrParts.join(', ')||'Tap to add address';
   document.getElementById('profOverlay').classList.add('show');
 }
-function closeProfModal(){document.getElementById('profOverlay').classList.remove('show')}
+function closeProfModal(){document.getElementById('profOverlay').classList.remove('show');}
+
+function openProfileEdit(){
+  const u=JSON.parse(localStorage.getItem('kwikar_user')||'{}');
+  document.getElementById('peNameVal').textContent=u.name||'';
+  document.getElementById('pePhoneVal').textContent=u.phone||'';
+  document.getElementById('peAddress').value=u.address||'';
+  document.getElementById('peCity').value=u.city||'';
+  document.getElementById('pePincode').value=u.pincode||'';
+  document.getElementById('peErr').textContent='';
+  document.getElementById('profEditOverlay').classList.add('show');
+}
+
+function closeProfEdit(){
+  document.getElementById('profEditOverlay').classList.remove('show');
+}
+
+async function saveProfileAddress(){
+  const address=document.getElementById('peAddress').value.trim();
+  const city   =document.getElementById('peCity').value.trim();
+  const pincode=document.getElementById('pePincode').value.trim();
+  const err    =document.getElementById('peErr');
+  const btn    =document.getElementById('peSaveBtn');
+  if(!address){err.textContent='Address daalna zaroori hai';return;}
+  if(!city)   {err.textContent='Shehar ka naam daalo';return;}
+  if(!/^\d{6}$/.test(pincode)){err.textContent='Sahi 6-digit pincode daalo';return;}
+  err.textContent='';
+  btn.disabled=true;
+  const orig=btn.textContent;
+  btn.textContent='Saving…';
+  try{
+    const u=JSON.parse(localStorage.getItem('kwikar_user')||'{}');
+    const res=await fetch(_BASE+'/backend/user_api.php?action=update_address',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone:u.phone,address,city,pincode})
+    });
+    const data=await res.json();
+    if(!data.success){err.textContent=data.error||'Save nahi ho paya';return;}
+    const updated={...u,address,city,pincode};
+    localStorage.setItem('kwikar_user',JSON.stringify(updated));
+    const addrParts=[address,city,pincode].filter(Boolean);
+    document.getElementById('profAddress').textContent=addrParts.join(', ');
+    closeProfEdit();
+  }catch(e){
+    err.textContent='Server se connect nahi ho paya — dobara try karo';
+  }finally{
+    btn.disabled=false;
+    btn.textContent=orig;
+  }
+}
 function logoutUser(){
   localStorage.removeItem('kwikar_user');
   localStorage.removeItem('kwikar_pin_done');
@@ -326,7 +434,15 @@ function isSlotExpired(b){
   }catch(e){return false;}
 }
 
+let _openBkDetailData = null;
+
 function openBkDetail(b){
+  _openBkDetailData = b;
+  _renderBkDetail(b);
+  document.getElementById('bkDetailOverlay').classList.add('show');
+}
+
+function _renderBkDetail(b){
   const status=b.status||'new';
   const isPending=['new','broadcasted','pending'].includes(status);
   const isAccepted=['accepted','assigned','arrived','ongoing','completed'].includes(status);
@@ -334,39 +450,99 @@ function openBkDetail(b){
   const expired=isPending&&isSlotExpired(b);
   const canCancel=isPending&&!expired;
 
-  const statusLabel={
-    new:'Pending — Waiting for Technician',broadcasted:'Pending — Waiting for Technician',
-    pending:'Pending — Waiting for Technician',accepted:'Confirmed — Technician is on the way',
-    assigned:'Confirmed — Technician Assigned',arrived:'Technician Arrived',
-    ongoing:'Work in Progress',completed:'Completed'
-  }[status]||status;
+  const statusMap={
+    new:       {label:'Waiting for Technician', cls:'bkst-pending'},
+    broadcasted:{label:'Waiting for Technician',cls:'bkst-pending'},
+    pending:   {label:'Waiting for Technician', cls:'bkst-pending'},
+    accepted:  {label:'Technician is on the way',cls:'bkst-confirmed'},
+    assigned:  {label:'Technician Assigned',    cls:'bkst-confirmed'},
+    arrived:   {label:'Technician Arrived',     cls:'bkst-confirmed'},
+    ongoing:   {label:'Work in Progress',       cls:'bkst-confirmed'},
+    completed: {label:'Completed',              cls:'bkst-done'},
+    cancelled: {label:'Cancelled',              cls:'bkst-cancelled'},
+  };
+  const st=statusMap[status]||{label:status,cls:'bkst-pending'};
 
-  const statusColor=isAccepted?'#16a34a':isPending?'#f59e0b':'#64748b';
-
+  // Technician card
   const techBlock = isAccepted && b.technician_name ? `
-    <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:12px 14px;margin:10px 0">
-      <div style="font-size:.7rem;font-weight:700;color:#16a34a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">✅ Technician Assigned</div>
-      <div class="bk-detail-row" style="margin-bottom:4px"><span>👷</span><span style="font-weight:800;color:#0d1b3e">${b.technician_name}</span></div>
-      <div class="bk-detail-row" style="margin-bottom:0"><span>📞</span><a href="tel:${b.technician_phone}" style="color:#1d4ed8;font-weight:700;text-decoration:none">${b.technician_phone}</a></div>
+    <div class="bkd-tech-card">
+      <div class="bkd-tech-avatar">${b.technician_name.charAt(0).toUpperCase()}</div>
+      <div class="bkd-tech-info">
+        <div class="bkd-tech-label">Assigned Technician</div>
+        <div class="bkd-tech-name">${b.technician_name}</div>
+      </div>
+      <a class="bkd-call-btn" href="tel:${b.technician_phone}" aria-label="Call technician">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </a>
     </div>` : '';
 
+  // Verification codes
+  const codesBlock = (b.happy_code && b.sad_code) ? `
+    <div class="bkd-codes-wrap">
+      <div class="bkd-codes-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Share verification code with technician
+      </div>
+      <div class="bkd-codes-row">
+        <div class="bkd-code bkd-code-happy">
+          <span class="bkd-code-lbl">Happy Code</span>
+          <span class="bkd-code-val">${b.happy_code}</span>
+        </div>
+        <div class="bkd-code bkd-code-sad">
+          <span class="bkd-code-lbl">Sad Code</span>
+          <span class="bkd-code-val">${b.sad_code}</span>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Searching state
+  const searchBlock=`
+    <div class="bkd-searching">
+      <div class="bkd-spin"></div>
+      <div class="bkd-searching-text">Finding a technician for you</div>
+      <div class="bkd-searching-sub">We'll notify you once a technician accepts your request</div>
+    </div>`;
+
+  // Expired state
+  const expiredBlock=`
+    <div class="bkd-sorry">
+      <div class="bkd-sorry-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="bkd-sorry-title">No Technician Found</div>
+      <div class="bkd-sorry-sub">No technician was available for your selected slot. Would you like to reschedule?</div>
+      <button class="bkd-reschedule-btn" onclick="closeBkDetail();window.location.href='booking.html?service=${encodeURIComponent(b.service)}'">Reschedule Booking</button>
+    </div>`;
+
+  // Cancelled state
+  const cancelledBlock=`<div class="bkd-cancelled">Booking has been cancelled</div>`;
+
+  const infoRows=`
+    <div class="bkd-info-rows">
+      ${b.slot_time?`<div class="bkd-info-row">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>${b.slot_time}</span>
+      </div>`:''}
+      ${b.slot_date?`<div class="bkd-info-row">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>${b.slot_date}</span>
+      </div>`:''}
+      ${!expired&&!isCancelled?`<div class="bkd-info-row bkd-status-row">
+        <div class="bkd-status-badge ${st.cls}">${st.label}</div>
+      </div>`:''}
+    </div>`;
+
   document.getElementById('bkDetailContent').innerHTML=`
-    <div class="bk-detail-service">${b.service} Service</div>
-    <div class="bk-detail-issue">${b.issue}${b.other_issue?' — '+b.other_issue:''}</div>
-    ${isCancelled
-      ? `<div class="bk-cancelled-note">❌ Yeh booking cancel ho chuki hai</div>`
-      : isAccepted
-        ? techBlock
-        : expired
-          ?`<div class="bk-sorry"><div class="bk-sorry-emoji">😔</div><div class="bk-sorry-title">Koi technician nahi mila!</div><div class="bk-sorry-sub">Selected time slot mein koi technician available nahi tha. Kya aap dobara schedule karna chahte hain?</div><button class="bk-reschedule-btn" onclick="closeBkDetail();window.location.href='booking.html?service=${encodeURIComponent(b.service)}'">🔄 Reschedule Karo</button></div>`
-          :`<div class="bk-searching"><div class="bk-spin"></div><div class="bk-searching-text">Ek available technician dhundh rahe hain...</div><div class="bk-searching-sub">Awaiting for a technician to accept your request</div></div>`
-    }
-    ${b.slot_time?`<div class="bk-detail-row"><span>⏰</span><span>${b.slot_time}</span></div>`:''}
-    ${b.slot_date?`<div class="bk-detail-row"><span>📅</span><span>${b.slot_date}</span></div>`:''}
-    ${!expired&&!isCancelled?`<div class="bk-detail-row"><span>📌</span><span style="color:${statusColor};font-weight:800">${statusLabel}</span></div>`:''}
-    ${canCancel?`<button type="button" class="bk-cancel-btn" id="bkCancelBtn" onclick="cancelBooking(${b.id})">❌ Booking Cancel Karo</button>`:''}
+    <div class="bkd-head">
+      <div class="bkd-service">${b.service} Service</div>
+      <div class="bkd-issue">${b.issue}${b.other_issue?' — '+b.other_issue:''}</div>
+    </div>
+    <div class="bkd-body">
+      ${isCancelled ? cancelledBlock : isAccepted ? techBlock+codesBlock : expired ? expiredBlock : searchBlock}
+      ${infoRows}
+      ${canCancel?`<button type="button" class="bkd-cancel-btn" id="bkCancelBtn" onclick="cancelBooking(${b.id})">Cancel Booking</button>`:''}
+    </div>
   `;
-  document.getElementById('bkDetailOverlay').classList.add('show');
 }
 
 async function cancelBooking(id){
@@ -577,7 +753,7 @@ async function submitAdminLogin(){
   }
 }
 
-async function submitAdminRegister(){
+async function submitAdminRegister(forceReset = false){
   const name  = (document.getElementById('adminRegName')?.value  || '').trim();
   const email = (document.getElementById('adminRegEmail')?.value  || '').trim();
   const pin   = (document.getElementById('adminRegPin')?.value    || '').trim();
@@ -590,22 +766,24 @@ async function submitAdminRegister(){
 
   btn.disabled = true;
   const orig = btn.textContent;
-  btn.textContent = 'Creating account…';
+  btn.textContent = forceReset ? 'Resetting…' : 'Creating account…';
   try {
     const url = _BASE + '/admin/backend/api/api.php?module=register';
     const res  = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      credentials:'include', body:JSON.stringify({name, email, pin})
+      credentials:'include', body:JSON.stringify({name, email, pin, force_reset: forceReset})
     });
-    const text = await res.text(); // get raw text first
-    console.log('Admin register response [' + res.status + ']:', text);
+    const text = await res.text();
     let data;
     try { data = JSON.parse(text); }
-    catch(_) { errEl.textContent = 'Server returned invalid response (status '+res.status+'). Check browser console.'; return; }
+    catch(_) { errEl.textContent = 'Server returned invalid response (status '+res.status+').'; return; }
     if (data.success) {
       try { localStorage.setItem('kw_admin', JSON.stringify(data.admin)); } catch(_) {}
       closeLoginModal();
       window.location.href = _BASE + '/admin/frontend/';
+    } else if (data.can_reset && !forceReset) {
+      // Show reset option
+      errEl.innerHTML = 'Admin already exists. <a href="#" onclick="submitAdminRegister(true);return false;" style="color:#6366f1;font-weight:600;">Reset &amp; Register with these credentials →</a>';
     } else {
       errEl.textContent = data.error || 'Registration failed';
     }
@@ -1079,8 +1257,20 @@ function startGreetCycle(name,isTech){
   ];
   const inner=document.getElementById('tickerInner');
   if(!inner)return;
-  const cards=msgs.map(m=>`<span class="ticker-card">${m}</span>`).join('');
-  inner.innerHTML=cards+cards;
+  inner.replaceChildren();
+  for(let r=0;r<2;r++){
+    msgs.forEach(m=>{
+      const card=document.createElement('span');
+      card.className='ticker-card';
+      card.textContent=m;
+      inner.appendChild(card);
+    });
+  }
+  // Restart animation after content renders so width:max-content is correct
+  inner.style.animation='none';
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{inner.style.animation='';});
+  });
 })();
 
 /* ══════════ INSTAGRAM PILL ANIMATION ══════════ */
@@ -1100,9 +1290,10 @@ function startGreetCycle(name,isTech){
   function reset(){el.className='insta-anim-text';el.style.removeProperty('--itx');}
 
   function applyScroll(){
-    reset();
-    void el.offsetWidth;
     const ov=el.offsetWidth-wrap.offsetWidth;
+    el.classList.remove('i-in','i-out','i-scroll');
+    el.style.removeProperty('--itx');
+    void el.offsetWidth;
     if(ov>0){el.style.setProperty('--itx',`-${ov+6}px`);el.classList.add('i-scroll');}
   }
 
@@ -1304,9 +1495,10 @@ async function submitTechSignup(){
   function reset(){el.className='search-anim-text';el.style.removeProperty('--stx');}
 
   function applyScroll(){
-    reset();
-    void el.offsetWidth;
     const ov=el.offsetWidth-wrap.offsetWidth;
+    el.classList.remove('s-in','s-out','s-scroll');
+    el.style.removeProperty('--stx');
+    void el.offsetWidth;
     if(ov>0){el.style.setProperty('--stx',`-${ov+6}px`);el.classList.add('s-scroll');}
   }
 
@@ -1409,6 +1601,119 @@ const bookingBack=document.getElementById('bookingBack');
 const bookingClose=document.getElementById('bookingClose');
 const bookingTitle=document.getElementById('bookingTitle');
 const bookKaroBtn=document.getElementById('bookKaroBtn');
+
+function bpiErr(img, bg, letter) {
+  const brandName = (img.alt || letter).replace(/\s+logo$/i, '').trim();
+  const pill = img.closest('.brand-pill-logo');
+  const el = document.createElement('i');
+  el.className = 'bpi';
+  el.style.setProperty('--bc', bg);
+  el.textContent = letter;
+  const label = document.createElement('span');
+  label.className = 'brand-fallback-name';
+  label.textContent = brandName || letter;
+  if (pill) pill.classList.add('brand-pill-fallback');
+  img.replaceWith(el, label);
+}
+
+/* ══ FLOATING REVIEW WIDGET ══ */
+let _reviewRating = 0;
+let _rvOpen = false;
+
+function toggleReviewWidget(){
+  const panel = document.getElementById('rvPanel');
+  if(!panel) return;
+  _rvOpen = !_rvOpen;
+  if(_rvOpen){
+    document.getElementById('rvFormView').style.display = '';
+    _reviewRating = 0;
+    document.querySelectorAll('.rv-star').forEach(s=>s.classList.remove('active'));
+    const name=document.getElementById('rvName');
+    const text=document.getElementById('rvText');
+    const err=document.getElementById('rvErr');
+    if(name)name.value = '';
+    if(text)text.value = '';
+    if(err)err.textContent = '';
+    panel.classList.add('open');
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+function setReviewRating(val){
+  _reviewRating = val;
+  document.querySelectorAll('.rv-star').forEach(s=>{
+    s.classList.toggle('active', parseInt(s.dataset.v) <= val);
+  });
+}
+
+async function submitReview(){
+  const text = document.getElementById('rvText').value.trim();
+  const name = document.getElementById('rvName').value.trim();
+  const err  = document.getElementById('rvErr');
+  const btn  = document.getElementById('rvSubmitBtn');
+  if(!_reviewRating){ err.textContent='Please select a star rating'; return; }
+  if(!text)          { err.textContent='Please write your review';    return; }
+  err.textContent = '';
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Submitting…';
+  try{
+    const u = JSON.parse(localStorage.getItem('kwikar_user')||'{}');
+    const res = await fetch(_BASE+'/backend/review_api.php',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name:name||u.name||'', phone:u.phone||'', rating:_reviewRating, review_text:text, page_source:'homepage'})
+    });
+    const data = await res.json();
+    if(!data.success){ err.textContent = data.error||'Could not submit — try again'; return; }
+    // Close panel, show small toast for 2s
+    _rvOpen = false;
+    document.getElementById('rvPanel').classList.remove('open');
+    const toast = document.getElementById('rvToast');
+    toast.classList.add('show');
+    setTimeout(()=>{ toast.classList.remove('show'); }, 2000);
+  }catch(e){
+    err.textContent = 'Could not connect — please try again';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// Init: panel starts hidden (element is after this script tag, so defer)
+// panel starts hidden via CSS (display:none by default, .open shows it)
+
+/* ══ HOMEPAGE TESTIMONIALS ══ */
+document.addEventListener('DOMContentLoaded', async function loadTestimonials(){
+  try{
+    const res  = await fetch(_BASE+'/backend/review_api.php?action=get_reviews&status=approved&limit=20');
+    const data = await res.json();
+    if(!data.success || !data.reviews.length) return;
+
+    const STARS = 5;
+    function starsSVG(rating){
+      return Array.from({length:STARS},(_,i)=>`
+        <svg class="rtcard-star${i>=rating?' empty':''}" viewBox="0 0 24 24">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>`).join('');
+    }
+
+    // Duplicate cards for seamless loop
+    const cards = [...data.reviews, ...data.reviews].map(r=>`
+      <div class="review-tcard">
+        <div class="rtcard-stars">${starsSVG(Number(r.rating))}</div>
+        <div class="rtcard-text">${r.review_text.replace(/</g,'&lt;')}</div>
+        <div class="rtcard-name">${r.name ? r.name.replace(/</g,'&lt;') : 'Anonymous'}</div>
+      </div>`).join('');
+
+    document.getElementById('testimonialsTrack').innerHTML = cards;
+    document.getElementById('testimonialsSection').style.display = '';
+
+    // Adjust animation duration based on card count
+    const dur = Math.max(20, data.reviews.length * 4);
+    document.querySelector('.testimonials-track').style.animationDuration = dur + 's';
+  }catch(e){ console.error('Testimonials load error:', e); }
+});
 
 function bookService(applianceKey){
   window.location.href='booking.html?service='+applianceKey;
@@ -1943,20 +2248,38 @@ function playBookingAcceptedBeep(){
   setTimeout(()=>playBeep(880,280),260);
   setTimeout(()=>playBeep(1100,350),560);
 }
-function showUserToast(msg){
+function playCompletionCodeBeep(){
+  playBeep(1047,140);
+  setTimeout(()=>playBeep(1319,140),170);
+  setTimeout(()=>playBeep(1568,280),340);
+}
+function showUserToast(msg,opts={}){
   let t=document.getElementById('_userToast');
   if(!t){
     t=document.createElement('div');
     t.id='_userToast';
-    t.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#0d1b3e;color:#fff;padding:12px 24px;border-radius:50px;font-size:.85rem;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3);transition:opacity .4s;white-space:nowrap;max-width:90vw;text-align:center';
+    t.style.cssText='position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:9999;transition:opacity .3s,transform .3s;opacity:0;pointer-events:none;width:min(92vw,360px)';
     document.body.appendChild(t);
   }
-  t.textContent=msg; t.style.opacity='1';
+  const icon=opts.icon||'✅';
+  const title=opts.title||msg;
+  const sub=opts.sub||'';
+  const accent=opts.accent||'#0d1b3e';
+  t.innerHTML=`<div style="background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(13,27,62,.14),0 1px 4px rgba(13,27,62,.08);padding:12px 14px;display:flex;align-items:center;gap:12px;border-left:3px solid ${accent}">
+    <div style="width:36px;height:36px;border-radius:10px;background:${accent}18;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icon}</div>
+    <div style="min-width:0">
+      <div style="font-size:13px;font-weight:700;color:#0d1b3e;line-height:1.3">${title}</div>
+      ${sub?`<div style="font-size:11px;color:#64748b;margin-top:1px;line-height:1.3">${sub}</div>`:''}
+    </div>
+  </div>`;
+  t.style.opacity='1';
+  t.style.transform='translateX(-50%) translateY(0)';
   clearTimeout(t._tmr);
-  t._tmr=setTimeout(()=>{t.style.opacity='0';},4500);
+  t._tmr=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(-12px)';},4500);
 }
 
 let _lastBookingStatuses={};
+let _lastBookingCodes={};
 let _bookingPollReady=false;
 
 async function pollBookingStatus(){
@@ -1969,16 +2292,33 @@ async function pollBookingStatus(){
     const json=await res.json();
     if(!json.success||!json.bookings) return;
     json.bookings.forEach(b=>{
-      const prev=_lastBookingStatuses[b.id];
-      // Only beep after first poll (so we don't beep on page load for already-confirmed bookings)
-      if(_bookingPollReady && prev && ['new','broadcasted','pending'].includes(prev) && ['accepted','assigned','arrived','ongoing'].includes(b.status)){
+      const prevStatus=_lastBookingStatuses[b.id];
+      const hadCodes=_lastBookingCodes[b.id];
+      const hasCodes=!!(b.happy_code&&b.sad_code);
+
+      // Beep: technician accepted
+      if(_bookingPollReady && prevStatus && ['new','broadcasted','pending'].includes(prevStatus) && ['accepted','assigned','arrived','ongoing'].includes(b.status)){
         playBookingAcceptedBeep();
-        const techLine = b.technician_name
-          ? ` 👷 ${b.technician_name}${b.technician_phone ? ' · 📞 '+b.technician_phone : ''}`
+        const techLine=b.technician_name
+          ? ` 👷 ${b.technician_name}${b.technician_phone?' · 📞 '+b.technician_phone:''}`
           : '';
-        showUserToast('✅ Booking accepted!' + techLine + ' — Technician is on the way.');
+        showUserToast('',{icon:'✅',title:'Technician on the way!',sub:b.technician_name?`👷 ${b.technician_name}${b.technician_phone?' · '+b.technician_phone:''}`:' Your booking has been confirmed.',accent:'#16a34a'});
       }
+
+      // Beep: completion codes just arrived
+      if(_bookingPollReady && !hadCodes && hasCodes){
+        playCompletionCodeBeep();
+        showUserToast('',{icon:'🔐',title:'Your codes are ready',sub:'Open booking details and share one code with the technician.',accent:'#1d4ed8'});
+        // Live-refresh detail modal if it's open for this booking
+        const overlay=document.getElementById('bkDetailOverlay');
+        if(overlay&&overlay.classList.contains('show')&&_openBkDetailData&&_openBkDetailData.id===b.id){
+          _openBkDetailData=b;
+          _renderBkDetail(b);
+        }
+      }
+
       _lastBookingStatuses[b.id]=b.status;
+      _lastBookingCodes[b.id]=hasCodes;
     });
     _bookingPollReady=true;
   }catch(e){}
@@ -1991,3 +2331,48 @@ async function pollBookingStatus(){
   pollBookingStatus(); // populate baseline statuses
   setInterval(pollBookingStatus,10000); // check every 10s
 })();
+
+// ══ LEGAL INFO DROPDOWN ══
+function toggleLegalMenu(){
+  const btn=document.getElementById("legalMenuBtn");
+  const dd=document.getElementById("legalMenuDropdown");
+  const open=dd.classList.toggle("open");
+  btn.classList.toggle("open",open);
+}
+document.addEventListener("click",function(e){
+  if(!e.target.closest(".footer-legal-section")){
+    document.getElementById("legalMenuDropdown")?.classList.remove("open");
+    document.getElementById("legalMenuBtn")?.classList.remove("open");
+  }
+});
+
+// ══ ABD MODAL ══
+const abdModal=document.getElementById('abdModal');
+const abdModalClose=document.getElementById('abdModalClose');
+function openAbdModal(){
+  if(!abdModal)return;
+  abdModal.classList.add('show');
+  abdModal.setAttribute('aria-hidden','false');
+  document.body.classList.add('modal-open');
+  setTimeout(()=>document.getElementById('abd-name')?.focus({preventScroll:true}),300);
+}
+function closeAbdModal(){
+  if(!abdModal)return;
+  abdModal.classList.remove('show');
+  abdModal.setAttribute('aria-hidden','true');
+  document.body.classList.remove('modal-open');
+}
+abdModalClose?.addEventListener('click',closeAbdModal);
+abdModal?.addEventListener('click',e=>{if(e.target===abdModal)closeAbdModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&abdModal?.classList.contains('show'))closeAbdModal()});
+
+function submitAbd(){
+  if(!abdModal)return;
+  const name=document.getElementById('abd-name').value.trim();
+  const phone=document.getElementById('abd-phone').value.trim();
+  const city=document.getElementById('abd-city').value.trim();
+  const pin=document.getElementById('abd-pin').value.trim();
+  if(!name||!phone||!city||!pin){alert('Poora form bharo pehle!');return;}
+  document.getElementById('abdFormBox').style.display='none';
+  document.getElementById('abdSuccess').style.display='block';
+}

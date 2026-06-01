@@ -131,6 +131,91 @@ function CustomersPage() {
   );
 }
 
+// ── Add Technician Modal ──────────────────────────────────────────────────────
+function AddTechModal({ open, onClose, onCreated }) {
+  const [form, setForm]       = useState({ name:'', phone:'', email:'', pin:'', abd_id:'' });
+  const [services, setServices] = useState([]);
+  const [abds, setAbds]       = useState([]);
+  const [selSvcs, setSelSvcs] = useState([]);
+  const [err, setErr]         = useState('');
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    window.adminApi('services_list').then(res => {
+      if (res.status === 'success') { setServices(res.services || []); setAbds(res.abds || []); }
+    }).catch(()=>{});
+  }, [open]);
+
+  function set(k, v) { setForm(p => ({...p, [k]:v})); setErr(''); }
+  function toggleSvc(id) { setSelSvcs(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]); }
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!form.name || !form.phone || !form.pin) { setErr('Name, phone and PIN are required'); return; }
+    setSaving(true); setErr('');
+    try {
+      const res = await window.adminApi('create_technician', { ...form, service_ids: selSvcs });
+      if (res.status === 'success') {
+        onCreated();
+        onClose();
+        setForm({ name:'', phone:'', email:'', pin:'', abd_id:'' });
+        setSelSvcs([]);
+      } else setErr(res.message || 'Failed to create technician');
+    } catch(e) { setErr('Server error'); }
+    setSaving(false);
+  }
+
+  if (!open) return null;
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
+      <div style={{ background:'#0D0E16', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16, width:460, padding:28, maxHeight:'88vh', overflowY:'auto', boxShadow:'0 24px 80px rgba(0,0,0,.8)' }} onClick={e=>e.stopPropagation()}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
+          <div style={{ fontFamily:'Space Grotesk', fontSize:16, fontWeight:700, color:'var(--text)' }}>Add New Technician</div>
+          <button className="kbtn" style={{ padding:'4px 8px' }} onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <form onSubmit={submit} autoComplete="off" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {[{k:'name',l:'Full Name',t:'text',ph:'e.g. Mohan Verma',ac:'off'},{k:'phone',l:'Phone Number',t:'tel',ph:'10-digit mobile number',ac:'off'},{k:'email',l:'Email (optional)',t:'text',ph:'mohan@example.com',ac:'off'},{k:'pin',l:'Login PIN (4-6 digits)',t:'password',ph:'Set a secure PIN',ac:'new-password'}].map(f=>(
+            <div key={f.k}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.06em', fontWeight:600 }}>{f.l}</div>
+              <input className="kinput" type={f.t} placeholder={f.ph} value={form[f.k]} autoComplete={f.ac} onChange={e=>set(f.k,e.target.value)} style={{ width:'100%', height:40, background:'rgba(255,255,255,0.06)', color:'var(--text)' }}/>
+            </div>
+          ))}
+
+          <div>
+            <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.06em', fontWeight:600 }}>Assign to ABD (optional)</div>
+            <select className="kinput" title="Assign to ABD" value={form.abd_id} onChange={e=>set('abd_id',e.target.value)} style={{ width:'100%', height:40, background:'rgba(255,255,255,0.06)', color:'var(--text)' }}>
+              <option value="" style={{ background:'#0D0E16' }}>— No ABD assigned —</option>
+              {abds.map(a=><option key={a.abd_id} value={a.abd_id} style={{ background:'#0D0E16' }}>{a.name}</option>)}
+            </select>
+          </div>
+
+          {services.length > 0 && (
+            <div>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:8, textTransform:'uppercase', letterSpacing:'.06em', fontWeight:600 }}>Services</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                {services.map(s=>(
+                  <button type="button" key={s.id} onClick={()=>toggleSvc(s.id)}
+                    className="kbtn"
+                    style={{ padding:'5px 12px', fontSize:12, background:selSvcs.includes(s.id)?'rgba(34,211,238,.15)':'rgba(255,255,255,0.06)', color:selSvcs.includes(s.id)?'var(--cyan)':'var(--text2)', borderColor:selSvcs.includes(s.id)?'rgba(34,211,238,.4)':'rgba(255,255,255,0.1)' }}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {err && <div style={{ fontSize:12, color:'var(--red)', padding:'8px 12px', background:'rgba(248,113,113,.1)', borderRadius:8, border:'1px solid rgba(248,113,113,.3)' }}>{err}</div>}
+          <div style={{ display:'flex', gap:8, marginTop:4 }}>
+            <button type="button" className="kbtn" style={{ flex:1, justifyContent:'center' }} onClick={onClose}>Cancel</button>
+            <button type="submit" className="kbtn p" style={{ flex:1, justifyContent:'center' }} disabled={saving}>{saving ? 'Creating…' : 'Create Technician'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Technicians ───────────────────────────────────────────────────────────────
 function TechDrawer({ tech, open, onClose, onAction }) {
   if (!tech) return null;
@@ -180,6 +265,7 @@ function TechniciansPage() {
   const [statusF, setStatusF]   = useState('all');
   const [selected, setSelected] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addOpen, setAddOpen]   = useState(false);
 
   function load() {
     setLoading(true);
@@ -212,8 +298,13 @@ function TechniciansPage() {
     <div className="page-wrap" style={{ paddingBottom:32 }}>
       <div className="page-header">
         <div><div className="page-title">Technicians</div><div className="page-sub">{counts.total} total · {counts.active} active</div></div>
-        <button className="kbtn p" onClick={load}><Ico n="refresh" s={13}/>Refresh</button>
+        <div style={{ display:'flex', gap:8 }}>
+          <button className="kbtn p" onClick={()=>setAddOpen(true)}><Ico n="plus" s={13}/>Add Technician</button>
+          <button className="kbtn" onClick={load}><Ico n="refresh" s={13}/>Refresh</button>
+        </div>
       </div>
+
+      <AddTechModal open={addOpen} onClose={()=>setAddOpen(false)} onCreated={load}/>
 
       <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:20 }}>
         {[{l:'Total',v:counts.total,c:'var(--cyan)',i:'wrench'},{l:'Active',v:counts.active,c:'var(--green)',i:'activity'},{l:'Pending KYC',v:counts.pending,c:'var(--amber)',i:'clock'},{l:'Suspended',v:counts.suspended,c:'var(--red)',i:'lock'}].map(m=>(

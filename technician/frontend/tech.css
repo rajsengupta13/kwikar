@@ -484,6 +484,16 @@ body {
   line-height: 1.5;
 }
 
+/* Plan unlocked state */
+.plan-blur-content.plan-unlocked {
+  filter: none;
+  pointer-events: auto;
+  -webkit-user-select: auto;
+  user-select: auto;
+  opacity: 1;
+}
+.plan-wrap-unlocked { overflow: visible; }
+
 /* ── Buttons ── */
 .btn {
   width: 100%; padding: 11px; border-radius: var(--r-s);
@@ -633,6 +643,103 @@ body {
   border-color: var(--accent); background: var(--white);
 }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Completion Code Modal ── */
+.cc-header { margin-bottom: 20px; }
+.cc-header-title { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+.cc-header-sub { font-size: 12px; color: var(--text-3); line-height: 1.45; }
+
+.cc-otp-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.cc-otp-box {
+  width: 58px; height: 62px;
+  border: 1.5px solid rgba(13,27,62,.13); border-radius: 12px;
+  font-size: 22px; font-weight: 700; text-align: center;
+  color: var(--navy); background: var(--bg); outline: none;
+  font-family: 'DM Sans', sans-serif;
+  transition: border-color .15s, background .15s, box-shadow .15s;
+  -webkit-appearance: none; appearance: none;
+}
+.cc-otp-box:focus {
+  border-color: var(--accent); background: var(--white);
+  box-shadow: 0 0 0 3px rgba(79,126,255,.12);
+}
+
+.cc-actions { display: flex; gap: 8px; }
+.cc-actions .btn-ghost { flex: 1; padding: 11px; text-align: center; border-radius: 12px; font-size: 13px; }
+.cc-actions .btn-primary { margin: 0; flex: 2; padding: 11px; font-size: 14px; font-weight: 600; border-radius: 12px; }
+
+/* ── Subscription Modal ── */
+.sub-badge {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  background: var(--warn-dim); color: var(--warn);
+  padding: 4px 10px; border-radius: 20px; margin-bottom: 10px;
+}
+.sub-title { font-size: 17px; font-weight: 800; color: var(--navy); margin-bottom: 4px; letter-spacing: -.3px; }
+.sub-desc  { font-size: 12px; color: var(--text-3); line-height: 1.5; margin-bottom: 18px; }
+
+.sub-plans { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+
+.sub-plan-card {
+  border: 1.5px solid rgba(13,27,62,.1); border-radius: 16px;
+  padding: 14px 14px 12px; background: var(--white);
+  transition: border-color .15s;
+}
+.sub-plan-card:hover { border-color: var(--accent); }
+.sub-plan-flex { border-color: rgba(79,126,255,.25); background: var(--accent-dim); }
+
+.sub-plan-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.sub-plan-name { font-size: 14px; font-weight: 700; color: var(--navy); }
+.sub-plan-price { font-size: 22px; font-weight: 800; color: var(--navy); letter-spacing: -.5px; }
+.sub-plan-price span { font-size: 12px; font-weight: 500; color: var(--text-3); }
+
+.sub-plan-perks { list-style: none; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.sub-plan-perks li { font-size: 12px; color: var(--text-2); }
+
+.sub-pay-btn {
+  width: 100%; padding: 11px; border-radius: 12px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 700; font-family: 'DM Sans', sans-serif;
+  background: var(--navy); color: #fff;
+  transition: opacity .15s, transform .1s;
+}
+.sub-pay-btn:active { opacity: .88; transform: scale(.98); }
+.sub-pay-btn:disabled { opacity: .55; cursor: not-allowed; }
+.sub-pay-flex { background: var(--accent); }
+
+.sub-later-btn { width: 100%; margin-top: 4px; padding: 11px; border-radius: 12px; text-align: center; }
+
+/* ── Service Charge Modal ── */
+.sc-icon { font-size: 28px; margin-bottom: 6px; }
+.sc-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+.sc-sub { font-size: 12px; color: var(--text-3); margin-bottom: 20px; line-height: 1.4; }
+
+.sc-amount-wrap {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg); border: 1.5px solid rgba(13,27,62,.12);
+  border-radius: 12px; padding: 0 14px; margin-bottom: 16px;
+  transition: border-color .15s;
+}
+.sc-amount-wrap:focus-within { border-color: var(--accent); background: var(--white); }
+.sc-rupee { font-size: 20px; font-weight: 700; color: var(--text-2); }
+.sc-amount-input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font-size: 28px; font-weight: 700; color: var(--navy);
+  font-family: 'DM Sans', sans-serif; padding: 14px 0;
+}
+.sc-amount-input::placeholder { color: #c8d0df; }
+
+.sc-label { font-size: 11px; font-weight: 600; color: var(--text-3); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+.sc-method-row { display: flex; gap: 8px; margin-bottom: 20px; }
+.sc-method {
+  flex: 1; padding: 10px; border-radius: 10px; font-size: 13px; font-weight: 600;
+  border: 1.5px solid rgba(13,27,62,.1); background: var(--bg);
+  color: var(--text-2); cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.sc-method.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+.sc-actions { display: flex; gap: 8px; }
+.sc-actions .btn-ghost { flex: 1; padding: 11px; text-align: center; border-radius: 12px; font-size: 13px; }
+.sc-actions .btn-primary { margin: 0; flex: 2; padding: 11px; font-size: 14px; font-weight: 600; border-radius: 12px; }
 
 /* ── Snackbar ── */
 .snackbar {

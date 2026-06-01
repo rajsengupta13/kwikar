@@ -2,6 +2,7 @@
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/razorpay.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -210,6 +211,11 @@ switch ($module) {
         $st->execute([$tid]);
         $jobStatus = $st->fetch(PDO::FETCH_ASSOC);
 
+        // Happy-code completed jobs (for plan unlock)
+        $st = $db->prepare("SELECT COUNT(*) AS cnt FROM bookings WHERE assigned_technician_id = ? AND satisfaction = 'happy'");
+        $st->execute([$tid]);
+        $happyJobsCount = (int) $st->fetch(PDO::FETCH_ASSOC)['cnt'];
+
         // 7-day earnings chart
         $st = $db->prepare("
             SELECT DATE(wt.created_at) AS day, COALESCE(SUM(wt.amount),0) AS amt
@@ -247,6 +253,23 @@ switch ($module) {
         $st->execute([$techUserId]);
         $totalWithdrawn = (float)$st->fetch(PDO::FETCH_ASSOC)['t'];
 
+        // Active Fix plan subscription
+        $st = $db->prepare("
+            SELECT ts.end_date
+            FROM   technician_subscriptions ts
+            JOIN   subscription_plans sp ON ts.subscription_plan_id = sp.id
+            WHERE  ts.technician_id = ? AND sp.name = 'fix'
+              AND  ts.status = 'active' AND ts.end_date >= CURDATE()
+              AND  ts.payment_status = 'paid'
+            ORDER  BY ts.end_date DESC
+            LIMIT  1
+        ");
+        $st->execute([$tid]);
+        $fixRow = $st->fetch(PDO::FETCH_ASSOC);
+        $activePlan = $fixRow
+            ? ['type' => 'fix', 'valid_until' => $fixRow['end_date']]
+            : ['type' => 'none'];
+
         // Recent notifications
         $st = $db->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 4");
         $st->execute([$techUserId]);
@@ -281,6 +304,8 @@ switch ($module) {
             'week_chart'    => ['data' => $weekData, 'labels' => $weekLabels, 'prev_week_total' => $prevWeekTotal],
             'notifications' => $notifs,
             'unread_count'  => $unread,
+            'happy_jobs'    => $happyJobsCount,
+            'active_plan'   => $activePlan,
         ]);
         break;
 
@@ -371,6 +396,35 @@ switch ($module) {
             $jobId  = (int) ($d['job_id'] ?? 0);   // booking_id
 
             if ($action === 'accept') {
+                // ── Free-tier / subscription gate ────────────────────────
+                try { $db->exec("ALTER TABLE bookings ADD COLUMN satisfaction ENUM('happy','sad') NULL"); } catch(Exception $e){}
+                $st = $db->prepare("SELECT COUNT(*) FROM bookings WHERE assigned_technician_id = ? AND satisfaction = 'happy'");
+                $st->execute([$tid]);
+                $happyJobs = (int) $st->fetchColumn();
+
+                if ($happyJobs >= 3) {
+                    // Check active Fix plan
+                    $st = $db->prepare("
+                        SELECT ts.id FROM technician_subscriptions ts
+                        JOIN   subscription_plans sp ON ts.subscription_plan_id = sp.id
+                        WHERE  ts.technician_id = ? AND sp.name = 'fix'
+                          AND  ts.status = 'active' AND ts.end_date >= CURDATE()
+                          AND  ts.payment_status = 'paid'
+                        LIMIT  1
+                    ");
+                    $st->execute([$tid]);
+                    if (!$st->fetchColumn()) {
+                        echo json_encode([
+                            'status'     => 'error',
+                            'code'       => 'subscription_required',
+                            'happy_jobs' => $happyJobs,
+                            'message'    => 'Purchase a plan to accept more jobs',
+                        ]);
+                        break;
+                    }
+                }
+                // ─────────────────────────────────────────────────────────
+
                 // Check broadcast exists and is pending
                 $st = $db->prepare("
                     SELECT bb.id FROM booking_broadcasts bb
@@ -385,28 +439,24 @@ switch ($module) {
 
                 $db->beginTransaction();
                 try {
-                    // Accept this broadcast
                     $db->prepare("
                         UPDATE booking_broadcasts
                         SET    response_status = 'accepted', accepted_at = NOW()
                         WHERE  booking_id = ? AND technician_id = ?
                     ")->execute([$jobId, $tid]);
 
-                    // Expire all other pending broadcasts for this booking
                     $db->prepare("
                         UPDATE booking_broadcasts
                         SET    response_status = 'expired'
                         WHERE  booking_id = ? AND technician_id != ? AND response_status = 'pending'
                     ")->execute([$jobId, $tid]);
 
-                    // Assign booking
                     $db->prepare("
                         UPDATE bookings
                         SET    assigned_technician_id = ?, status = 'accepted'
                         WHERE  id = ? AND status IN ('new', 'broadcasted')
                     ")->execute([$tid, $jobId]);
 
-                    // Status log
                     $db->prepare("
                         INSERT INTO booking_status_logs (booking_id, status, changed_by, note)
                         VALUES (?, 'accepted', ?, 'Technician accepted job')
@@ -419,7 +469,103 @@ switch ($module) {
                     echo json_encode(['status' => 'error', 'message' => 'Accept failed: ' . $ex->getMessage()]);
                 }
 
+            } elseif ($action === 'generate_codes') {
+                // Ensure completion code columns exist — each separately so one existing column
+                // doesn't fail the others (MySQL fails the whole ALTER TABLE on any duplicate)
+                try { $db->exec("ALTER TABLE bookings ADD COLUMN happy_code CHAR(4) NULL"); } catch (Exception $e) {}
+                try { $db->exec("ALTER TABLE bookings ADD COLUMN sad_code CHAR(4) NULL"); } catch (Exception $e) {}
+                try { $db->exec("ALTER TABLE bookings ADD COLUMN satisfaction ENUM('happy','sad') NULL"); } catch (Exception $e) {}
+
+                // Verify booking belongs to this technician and is ongoing
+                $st = $db->prepare("
+                    SELECT b.id, c.user_id AS customer_user_id, u.name AS customer_name
+                    FROM   bookings b
+                    JOIN   customers c ON b.customer_id = c.id
+                    JOIN   users u     ON c.user_id = u.id
+                    WHERE  b.id = ? AND b.assigned_technician_id = ?
+                      AND  b.status IN ('accepted','assigned','arrived','ongoing')
+                    LIMIT 1
+                ");
+                $st->execute([$jobId, $tid]);
+                $booking = $st->fetch(PDO::FETCH_ASSOC);
+
+                if (!$booking) {
+                    echo json_encode(['status' => 'error', 'message' => 'Booking not found or not active']);
+                    break;
+                }
+
+                // Generate two distinct 4-digit codes
+                do {
+                    $happyCode = str_pad((string) rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+                    $sadCode   = str_pad((string) rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+                } while ($happyCode === $sadCode);
+
+                $db->prepare("UPDATE bookings SET happy_code = ?, sad_code = ? WHERE id = ?")
+                   ->execute([$happyCode, $sadCode, $jobId]);
+
+                // Notify customer with both codes
+                $customerUserId = (int) $booking['customer_user_id'];
+                $db->prepare("
+                    INSERT INTO notifications (user_id, title, message, type)
+                    VALUES (?, 'Job Completion Codes', ?, 'booking')
+                ")->execute([
+                    $customerUserId,
+                    "Your technician has completed the job. Happy Code: {$happyCode} | Sad Code: {$sadCode}. Share one with the technician to close the booking."
+                ]);
+
+                echo json_encode(['status' => 'success', 'message' => 'Codes generated and sent to customer']);
+
+            } elseif ($action === 'verify_code') {
+                $code = trim($d['code'] ?? '');
+
+                $st = $db->prepare("
+                    SELECT happy_code, sad_code
+                    FROM   bookings
+                    WHERE  id = ? AND assigned_technician_id = ?
+                      AND  status IN ('accepted','assigned','arrived','ongoing')
+                    LIMIT 1
+                ");
+                $st->execute([$jobId, $tid]);
+                $booking = $st->fetch(PDO::FETCH_ASSOC);
+
+                if (!$booking) {
+                    echo json_encode(['status' => 'error', 'message' => 'Booking not found']);
+                    break;
+                }
+                if (!$booking['happy_code']) {
+                    echo json_encode(['status' => 'error', 'message' => 'Codes not generated yet — tap Mark Complete first']);
+                    break;
+                }
+                if ($code !== $booking['happy_code'] && $code !== $booking['sad_code']) {
+                    echo json_encode(['status' => 'error', 'message' => 'Wrong code — ask the customer to check their notification']);
+                    break;
+                }
+
+                $satisfaction = ($code === $booking['happy_code']) ? 'happy' : 'sad';
+
+                $db->beginTransaction();
+                try {
+                    $db->prepare("
+                        UPDATE bookings SET status = 'completed', satisfaction = ?
+                        WHERE  id = ? AND assigned_technician_id = ?
+                    ")->execute([$satisfaction, $jobId, $tid]);
+
+                    $db->prepare("
+                        INSERT INTO booking_status_logs (booking_id, status, changed_by, note)
+                        VALUES (?, 'completed', ?, ?)
+                    ")->execute([$jobId, $techUserId, "Job completed — customer satisfaction: {$satisfaction}"]);
+
+                    $db->prepare("UPDATE technicians SET total_jobs = total_jobs + 1 WHERE id = ?")->execute([$tid]);
+
+                    $db->commit();
+                    echo json_encode(['status' => 'success', 'satisfaction' => $satisfaction, 'message' => 'Job completed']);
+                } catch (Exception $ex) {
+                    $db->rollBack();
+                    echo json_encode(['status' => 'error', 'message' => 'Complete failed: ' . $ex->getMessage()]);
+                }
+
             } elseif ($action === 'complete') {
+                // Legacy direct-complete (kept for backwards compatibility)
                 $db->beginTransaction();
                 try {
                     $db->prepare("
@@ -432,7 +578,6 @@ switch ($module) {
                         VALUES (?, 'completed', ?, 'Job completed by technician')
                     ")->execute([$jobId, $techUserId]);
 
-                    // Increment technician job count
                     $db->prepare("UPDATE technicians SET total_jobs = total_jobs + 1 WHERE id = ?")->execute([$tid]);
 
                     $db->commit();
@@ -440,6 +585,32 @@ switch ($module) {
                 } catch (Exception $ex) {
                     $db->rollBack();
                     echo json_encode(['status' => 'error', 'message' => 'Complete failed: ' . $ex->getMessage()]);
+                }
+
+            } elseif ($action === 'record_charge') {
+                $amount = round(floatval($d['amount'] ?? 0), 2);
+                $method = in_array($d['payment_method'] ?? '', ['cash','upi']) ? $d['payment_method'] : 'cash';
+
+                if ($amount <= 0) { echo json_encode(['status' => 'error', 'message' => 'Invalid amount']); break; }
+
+                $st = $db->prepare("SELECT id FROM bookings WHERE id = ? AND assigned_technician_id = ? AND status = 'completed' LIMIT 1");
+                $st->execute([$jobId, $tid]);
+                if (!$st->fetchColumn()) { echo json_encode(['status' => 'error', 'message' => 'Job not found']); break; }
+
+                $wallet = getWallet($db, $techUserId);
+                $db->beginTransaction();
+                try {
+                    $db->prepare("UPDATE bookings SET final_amount = ? WHERE id = ?")->execute([$amount, $jobId]);
+                    $db->prepare("UPDATE wallets SET balance = balance + ? WHERE id = ?")->execute([$amount, $wallet['id']]);
+                    $db->prepare("
+                        INSERT INTO wallet_transactions (wallet_id, reference_type, reference_id, transaction_type, amount, note)
+                        VALUES (?, 'booking', ?, 'credit', ?, ?)
+                    ")->execute([$wallet['id'], $jobId, $amount, "Service charge via {$method} — Job #{$jobId}"]);
+                    $db->commit();
+                    echo json_encode(['status' => 'success', 'message' => 'Charge recorded', 'amount' => $amount]);
+                } catch (Exception $ex) {
+                    $db->rollBack();
+                    echo json_encode(['status' => 'error', 'message' => 'Failed: ' . $ex->getMessage()]);
                 }
 
             } else {
@@ -1009,6 +1180,153 @@ switch ($module) {
         } catch (Exception $ex) {
             $db->rollBack();
             echo json_encode(['status' => 'error', 'message' => 'Payment failed: ' . $ex->getMessage()]);
+        }
+        break;
+
+    // ════════════════════════════════════════════════════════════════════════
+    case 'razorpay':
+        $action = $d['action'] ?? '';
+
+        if ($action === 'create_order') {
+            $plan   = $d['plan'] ?? '';   // 'fix' or 'flex'
+            $jobId  = (int) ($d['job_id'] ?? 0);
+
+            if (!in_array($plan, ['fix', 'flex'])) {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid plan']);
+                break;
+            }
+
+            $amountPaise = $plan === 'fix' ? 49900 : 14900;
+            $receipt     = 'kwikar_' . $tid . '_' . time();
+
+            $payload = json_encode([
+                'amount'   => $amountPaise,
+                'currency' => 'INR',
+                'receipt'  => $receipt,
+                'notes'    => ['technician_id' => $tid, 'plan' => $plan, 'job_id' => $jobId],
+            ]);
+
+            $ch = curl_init('https://api.razorpay.com/v1/orders');
+            curl_setopt_array($ch, [
+                CURLOPT_USERPWD        => RAZORPAY_KEY_ID . ':' . RAZORPAY_KEY_SECRET,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            $order = json_decode($response, true);
+            if ($httpCode === 200 && isset($order['id'])) {
+                echo json_encode([
+                    'status'   => 'success',
+                    'order_id' => $order['id'],
+                    'amount'   => $amountPaise,
+                    'key'      => RAZORPAY_KEY_ID,
+                    'plan'     => $plan,
+                    'job_id'   => $jobId,
+                ]);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Could not create Razorpay order — check your API keys']);
+            }
+
+        } elseif ($action === 'verify_payment') {
+            $orderId   = $d['razorpay_order_id']   ?? '';
+            $paymentId = $d['razorpay_payment_id']  ?? '';
+            $signature = $d['razorpay_signature']   ?? '';
+            $plan      = $d['plan']                 ?? '';
+            $jobId     = (int) ($d['job_id']        ?? 0);
+
+            // Verify Razorpay signature
+            $expected = hash_hmac('sha256', $orderId . '|' . $paymentId, RAZORPAY_KEY_SECRET);
+            if (!hash_equals($expected, $signature)) {
+                echo json_encode(['status' => 'error', 'message' => 'Payment verification failed — invalid signature']);
+                break;
+            }
+
+            if ($plan === 'fix') {
+                // Auto-seed fix plan if not present
+                $db->exec("INSERT IGNORE INTO subscription_plans (name, description, duration_days, price, status)
+                           VALUES ('fix', 'Fix Plan — unlimited jobs for 30 days', 30, 499.00, 'active')");
+                $st = $db->prepare("SELECT id FROM subscription_plans WHERE name = 'fix' AND status = 'active' LIMIT 1");
+                $st->execute();
+                $planId = (int) $st->fetchColumn();
+
+                // Technician pincode
+                $st = $db->prepare("SELECT pincode_id FROM technician_pincodes WHERE technician_id = ? AND is_active = 1 LIMIT 1");
+                $st->execute([$tid]);
+                $pincodeId = $st->fetchColumn() ?: null;
+
+                $start = date('Y-m-d');
+                $end   = date('Y-m-d', strtotime('+30 days'));
+
+                $db->prepare("
+                    INSERT INTO technician_subscriptions
+                        (technician_id, subscription_plan_id, pincode_id, amount_paid, start_date, end_date, payment_status, status)
+                    VALUES (?, ?, ?, 499.00, ?, ?, 'paid', 'active')
+                ")->execute([$tid, $planId, $pincodeId, $start, $end]);
+
+                // Notify technician
+                $db->prepare("INSERT INTO notifications (user_id, title, message, type) VALUES (?, ?, ?, 'subscription')")
+                   ->execute([$techUserId, 'Fix Plan Activated!', "Your Fix Plan is active until {$end}. Accept unlimited jobs!"]);
+
+                echo json_encode(['status' => 'success', 'plan' => 'fix', 'valid_until' => $end]);
+
+            } elseif ($plan === 'flex') {
+                // Auto-seed flex plan
+                $db->exec("INSERT IGNORE INTO subscription_plans (name, description, duration_days, price, status)
+                           VALUES ('flex', 'Flex Plan — pay per job acceptance', 0, 149.00, 'active')");
+                $st = $db->prepare("SELECT id FROM subscription_plans WHERE name = 'flex' AND status = 'active' LIMIT 1");
+                $st->execute();
+                $planId = (int) $st->fetchColumn();
+
+                $db->beginTransaction();
+                try {
+                    // Record flex subscription use
+                    $db->prepare("
+                        INSERT INTO technician_subscriptions
+                            (technician_id, subscription_plan_id, pincode_id, amount_paid, start_date, end_date, payment_status, status)
+                        VALUES (?, ?, NULL, 149.00, CURDATE(), CURDATE(), 'paid', 'active')
+                    ")->execute([$tid, $planId]);
+
+                    // Accept the job directly
+                    $db->prepare("
+                        UPDATE booking_broadcasts
+                        SET    response_status = 'accepted', accepted_at = NOW()
+                        WHERE  booking_id = ? AND technician_id = ?
+                    ")->execute([$jobId, $tid]);
+
+                    $db->prepare("
+                        UPDATE booking_broadcasts
+                        SET    response_status = 'expired'
+                        WHERE  booking_id = ? AND technician_id != ? AND response_status = 'pending'
+                    ")->execute([$jobId, $tid]);
+
+                    $db->prepare("
+                        UPDATE bookings
+                        SET    assigned_technician_id = ?, status = 'accepted'
+                        WHERE  id = ? AND status IN ('new','broadcasted')
+                    ")->execute([$tid, $jobId]);
+
+                    $db->prepare("
+                        INSERT INTO booking_status_logs (booking_id, status, changed_by, note)
+                        VALUES (?, 'accepted', ?, 'Accepted via Flex Plan payment')
+                    ")->execute([$jobId, $techUserId]);
+
+                    $db->commit();
+                    echo json_encode(['status' => 'success', 'plan' => 'flex', 'job_accepted' => true]);
+                } catch (Exception $ex) {
+                    $db->rollBack();
+                    echo json_encode(['status' => 'error', 'message' => 'Job accept failed: ' . $ex->getMessage()]);
+                }
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid plan']);
+            }
+
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid action']);
         }
         break;
 

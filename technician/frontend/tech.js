@@ -457,6 +457,30 @@ async function loadDashboard() {
       const dot = document.getElementById('notifBadgeDot');
       if (dot) dot.classList.add('show');
     }
+
+    // Active plan status — update hero pill + plan page buttons
+    const ap = data.active_plan || {};
+    set('heroPillPlan', ap.type === 'fix' ? 'Fix' : 'Flex');
+    if (ap.type === 'fix') {
+      _applyFixPlanUI(ap.valid_until || '');
+    }
+
+    // Unlock Plan section after 3 happy-code jobs
+    const happyJobs = parseInt(data.happy_jobs) || 0;
+    const planWrap    = document.querySelector('.plan-blur-wrap');
+    const planContent = document.querySelector('.plan-blur-content');
+    const planOverlay = document.querySelector('.plan-coming-soon');
+    if (planWrap && planContent && planOverlay) {
+      if (happyJobs >= 3) {
+        planContent.classList.add('plan-unlocked');
+        planOverlay.style.display = 'none';
+        planWrap.classList.add('plan-wrap-unlocked');
+      } else {
+        const remaining = 3 - happyJobs;
+        const cs = planOverlay.querySelector('.plan-cs-sub');
+        if (cs) cs.textContent = `Complete ${remaining} more happy job${remaining !== 1 ? 's' : ''} to unlock plan management`;
+      }
+    }
   } catch(e) {}
 }
 
@@ -551,21 +575,31 @@ async function loadWallet() {
         }
       }
 
-      TXNS = (data.transactions || []).map(t => ({
-        id:   t.transaction_id || t.id,
-        desc: t.description || t.note || 'Transaction',
-        amt:  parseFloat(t.amount) || 0,
-        type: t.transaction_type === 'credit' ? 'cr' : 'dr',
-        date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '',
-        ico:  t.transaction_type === 'debit' ? 'fas fa-university' : 'fas fa-tools',
-        ibg:  t.transaction_type === 'debit' ? 'var(--danger-dim)' : 'var(--success-dim)',
-        ic:   t.transaction_type === 'debit' ? 'var(--danger)'     : 'var(--success)'
-      }));
+      TXNS = (data.transactions || []).map(t => {
+        const isCr  = t.transaction_type === 'credit';
+        const ref   = t.reference_type || '';
+        const ico   = !isCr ? 'fas fa-university'
+                    : ref === 'booking'      ? 'fas fa-hand-holding-usd'
+                    : ref === 'subscription' ? 'fas fa-star'
+                    : 'fas fa-wallet';
+        return {
+          id:   t.transaction_id || t.id,
+          desc: t.note || t.description || 'Transaction',
+          amt:  parseFloat(t.amount) || 0,
+          type: isCr ? 'cr' : 'dr',
+          date: t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '',
+          ico,
+          ibg:  isCr ? 'var(--success-dim)' : 'var(--danger-dim)',
+          ic:   isCr ? 'var(--success)'     : 'var(--danger)'
+        };
+      });
     }
   } catch(e) {}
 }
 
 // ── Actions ───────────────────────────────────────────────
+let _pendingAcceptJobId = null;
+
 async function acceptJob(id) {
   try {
     const res  = await fetch(API+'?module=jobs', {
@@ -578,28 +612,314 @@ async function acceptJob(id) {
       await loadJobsFromAPI();
       renderJobs('ongoing');
       renderSchedule();
+    } else if (data.code === 'subscription_required') {
+      _pendingAcceptJobId = id;
+      openModal('subscriptionOverlay');
     } else {
       showSnack(data.message || 'Could not accept job');
     }
   } catch(e) { showSnack('Network error — try again'); }
 }
 
+async function initiatePayment(plan) {
+  const btn = document.getElementById(plan === 'fix' ? 'fixPayBtn' : 'flexPayBtn');
+  const jobId = plan === 'flex' ? (_pendingAcceptJobId || 0) : 0;
+
+  if (plan === 'flex' && !jobId) { showSnack('No job selected — go back and tap Accept first'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating order…';
+
+  try {
+    const res  = await fetch(API+'?module=razorpay', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'create_order', plan, job_id: jobId})
+    });
+    const data = await res.json();
+
+    if (data.status !== 'success') {
+      showSnack(data.message || 'Could not create order');
+      btn.disabled = false;
+      btn.textContent = plan === 'fix' ? 'Pay ₹499 with Razorpay' : 'Pay ₹149 with Razorpay';
+      return;
+    }
+
+    const rzp = new Razorpay({
+      key:         data.key,
+      amount:      data.amount,
+      currency:    'INR',
+      name:        'Kwikar',
+      description: plan === 'fix' ? 'Fix Plan — ₹499/month unlimited jobs' : 'Flex Plan — ₹149 for this job',
+      order_id:    data.order_id,
+      theme:       { color: '#4F7EFF' },
+      handler: async function(response) {
+        btn.disabled = true;
+        btn.textContent = 'Verifying…';
+        try {
+          const vRes = await fetch(API+'?module=razorpay', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              action:                 'verify_payment',
+              plan,
+              job_id:                 jobId,
+              razorpay_order_id:      response.razorpay_order_id,
+              razorpay_payment_id:    response.razorpay_payment_id,
+              razorpay_signature:     response.razorpay_signature,
+            })
+          });
+          const vData = await vRes.json();
+          if (vData.status === 'success') {
+            closeModal('subscriptionOverlay');
+            if (plan === 'fix') {
+              showSnack('🎉 Fix Plan activated! Accept unlimited jobs for 30 days.');
+              // Now re-accept the pending job
+              if (_pendingAcceptJobId) {
+                await acceptJob(_pendingAcceptJobId);
+                _pendingAcceptJobId = null;
+              }
+            } else {
+              showSnack('✅ Payment done! Job accepted.');
+              _pendingAcceptJobId = null;
+              await loadJobsFromAPI();
+              renderJobs('ongoing');
+              renderSchedule();
+            }
+          } else {
+            showSnack(vData.message || 'Payment verification failed');
+          }
+        } catch(e) { showSnack('Verification error — contact support'); }
+        finally { btn.disabled = false; btn.textContent = plan === 'fix' ? 'Pay ₹499 with Razorpay' : 'Pay ₹149 with Razorpay'; }
+      },
+      modal: {
+        ondismiss() {
+          btn.disabled = false;
+          btn.textContent = plan === 'fix' ? 'Pay ₹499 with Razorpay' : 'Pay ₹149 with Razorpay';
+        }
+      }
+    });
+    rzp.open();
+  } catch(e) {
+    showSnack('Network error — try again');
+    btn.disabled = false;
+    btn.textContent = plan === 'fix' ? 'Pay ₹499 with Razorpay' : 'Pay ₹149 with Razorpay';
+  }
+}
+
+// ── Purchase Fix Plan directly from the Plan page ────────────────────────────
+async function purchaseFixPlan(btn) {
+  btn.disabled  = true;
+  btn.textContent = 'Creating order…';
+
+  try {
+    const res  = await fetch(API + '?module=razorpay', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'create_order', plan: 'fix', job_id: 0})
+    });
+    const data = await res.json();
+
+    if (data.status !== 'success') {
+      showSnack(data.message || 'Could not create order');
+      btn.disabled = false;
+      btn.textContent = 'Get Fix Plan — ₹499';
+      return;
+    }
+
+    const rzp = new Razorpay({
+      key:         data.key,
+      amount:      data.amount,
+      currency:    'INR',
+      name:        'Kwikar',
+      description: 'Fix Plan — ₹499/month unlimited jobs',
+      order_id:    data.order_id,
+      theme:       {color: '#4F7EFF'},
+      handler: async function(response) {
+        try {
+          const vRes  = await fetch(API + '?module=razorpay', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              action:              'verify_payment',
+              plan:                'fix',
+              job_id:              0,
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+            })
+          });
+          const vData = await vRes.json();
+          if (vData.status === 'success') {
+            const until = vData.valid_until || '';
+            _applyFixPlanUI(until);
+            showSnack('🎉 Fix Plan activated! Unlimited jobs until ' + (until || '30 days'));
+          } else {
+            showSnack(vData.message || 'Payment verification failed');
+            btn.disabled = false;
+            btn.textContent = 'Get Fix Plan — ₹499';
+          }
+        } catch(e) {
+          showSnack('Verification error — contact support');
+          btn.disabled = false;
+          btn.textContent = 'Get Fix Plan — ₹499';
+        }
+      },
+      modal: {
+        ondismiss() {
+          btn.disabled = false;
+          btn.textContent = 'Get Fix Plan — ₹499';
+        }
+      }
+    });
+    rzp.open();
+  } catch(e) {
+    showSnack('Network error — try again');
+    btn.disabled = false;
+    btn.textContent = 'Get Fix Plan — ₹499';
+  }
+}
+
+// Apply Fix Plan active state to the Plan page cards
+function _applyFixPlanUI(validUntil) {
+  const fixBtn = document.getElementById('planFixBtn');
+  const flexBtn = document.getElementById('planFlexBtn');
+  if (fixBtn) {
+    fixBtn.textContent = validUntil ? '✓ Active until ' + validUntil : '✓ Fix Plan Active';
+    fixBtn.disabled    = true;
+    fixBtn.className   = 'btn btn-primary';
+  }
+  if (flexBtn) {
+    flexBtn.textContent = 'Switch to Flex';
+    flexBtn.disabled    = false;
+    flexBtn.className   = 'btn btn-secondary';
+  }
+  // Update hero pill
+  set('heroPillPlan', 'Fix');
+}
+
+let _pendingCompleteJobId = null;
+
+function _initOtpBoxes() {
+  const boxes = [...document.querySelectorAll('.cc-otp-box')];
+  boxes.forEach((box, i) => {
+    box.value = '';
+    box.oninput = () => {
+      box.value = box.value.replace(/\D/g, '').slice(-1);
+      if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
+    };
+    box.onkeydown = e => {
+      if (e.key === 'Backspace' && !box.value && i > 0) boxes[i - 1].focus();
+    };
+    box.onpaste = e => {
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 4);
+      [...text].forEach((ch, j) => { if (boxes[j]) boxes[j].value = ch; });
+      const next = Math.min(text.length, boxes.length - 1);
+      boxes[next].focus();
+    };
+  });
+}
+
 async function completeJob(id) {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
     const res  = await fetch(API+'?module=jobs', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'complete', job_id: id})
+      body: JSON.stringify({action:'generate_codes', job_id: id})
     });
     const data = await res.json();
     if (data.status === 'success') {
-      showSnack('🎉 Job marked complete!');
+      _pendingCompleteJobId = id;
+      _initOtpBoxes();
+      openModal('completionCodeOverlay');
+      setTimeout(() => document.querySelector('.cc-otp-box')?.focus(), 350);
+      showSnack('Codes sent to customer. Ask them for the code.');
+    } else {
+      showSnack(data.message || 'Could not generate codes');
+    }
+  } catch(e) { showSnack('Network error — try again'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Mark Complete'; } }
+}
+
+function cancelCompletionCode() {
+  _pendingCompleteJobId = null;
+  document.querySelectorAll('.cc-otp-box').forEach(b => b.value = '');
+  closeModal('completionCodeOverlay');
+}
+
+async function verifyCompletionCode() {
+  const code = [...document.querySelectorAll('.cc-otp-box')].map(b => b.value).join('');
+  if (code.length !== 4) { showSnack('Enter the 4-digit code from the customer'); return; }
+  if (!_pendingCompleteJobId) { closeModal('completionCodeOverlay'); return; }
+
+  try {
+    const res  = await fetch(API+'?module=jobs', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'verify_code', job_id: _pendingCompleteJobId, code})
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      closeModal('completionCodeOverlay');
+      document.querySelectorAll('.cc-otp-box').forEach(b => b.value = '');
+      // Open charge upload sheet
+      document.getElementById('scAmountInput').value = '';
+      document.querySelectorAll('.sc-method').forEach(b => b.classList.toggle('active', b.dataset.method === 'cash'));
+      openModal('chargeOverlay');
+      setTimeout(() => document.getElementById('scAmountInput').focus(), 350);
       await loadJobsFromAPI();
       renderJobs('completed');
       renderSchedule();
     } else {
-      showSnack(data.message || 'Could not complete job');
+      showSnack(data.message || 'Invalid code — ask the customer again');
     }
   } catch(e) { showSnack('Network error — try again'); }
+}
+
+function selectMethod(btn) {
+  document.querySelectorAll('.sc-method').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+async function submitServiceCharge() {
+  const amt = parseFloat(document.getElementById('scAmountInput').value);
+  if (!amt || amt <= 0) { showSnack('Enter a valid amount'); return; }
+  const method = document.querySelector('.sc-method.active')?.dataset.method || 'cash';
+  const jobId  = _pendingCompleteJobId;
+  const btn    = document.getElementById('scSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    const res = await fetch(API + '?module=jobs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'record_charge', job_id: jobId, amount: amt, payment_method: method })
+    });
+    const data = await res.json();
+    closeModal('chargeOverlay');
+    _pendingCompleteJobId = null;
+    if (data.status === 'success') {
+      showSnack(`✅ ₹${amt.toLocaleString('en-IN')} charge recorded!`);
+      // Force-refresh earnings panel so new transaction appears immediately
+      chartsReady.earn = false;
+      await loadWallet();
+      renderTxns();
+      if (currentSection === 'earn') {
+        chartsReady.earn = true;
+        setTimeout(initEarnChart, 200);
+      }
+      loadDashboard();
+    } else {
+      showSnack(data.message || 'Could not save charge');
+    }
+  } catch(e) {
+    closeModal('chargeOverlay');
+    _pendingCompleteJobId = null;
+    showSnack('✅ Job closed successfully');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Upload Charge';
+  }
+}
+
+function skipServiceCharge() {
+  _pendingCompleteJobId = null;
+  closeModal('chargeOverlay');
+  showSnack('✅ Job closed successfully');
 }
 
 function declineJob(id) { showSnack('Job declined'); }

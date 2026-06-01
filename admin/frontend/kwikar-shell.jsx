@@ -126,6 +126,7 @@ const NAV = [
   { id:'areas', label:'Pincode & Areas', icon:'mapPin', group:'geo' },
   { id:'promotions', label:'Promotions & Boosts', icon:'zap', group:'geo' },
   { id:'reports', label:'Reports & Analytics', icon:'barChart', group:'analytics' },
+  { id:'reviews', label:'Site Reviews', icon:'star', group:'support' },
   { id:'complaints', label:'Complaints', icon:'alertCircle', group:'support' },
   { id:'fraud', label:'Fraud Detection', icon:'shield', group:'support' },
   { id:'notifications', label:'Notifications', icon:'bell', group:'system' },
@@ -355,6 +356,7 @@ function KwikarApp() {
     subscriptions:() => <PlaceholderPage label="Subscription Plans"/>,
     areas:        () => <PlaceholderPage label="Pincode & Area Control"/>,
     promotions:   () => <PlaceholderPage label="Promotions & Boosts"/>,
+    reviews:      () => <ReviewsPage/>,
     complaints:   () => <PlaceholderPage label="Complaints & Disputes"/>,
   };
 

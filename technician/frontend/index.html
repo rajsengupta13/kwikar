@@ -6,7 +6,7 @@
 <title>Kwikar — Technician Panel</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="tech.css?v=20260524">
+<link rel="stylesheet" href="tech.css?v=20260601">
 </head>
 <body>
 
@@ -311,7 +311,7 @@
               <i class="fas fa-lightbulb" style="color:var(--warn);"></i>
               Best for technicians with a steady local client base
             </div>
-            <button type="button" class="btn btn-secondary">Get Fix Plan</button>
+            <button type="button" class="btn btn-secondary" id="planFixBtn" onclick="purchaseFixPlan(this)">Get Fix Plan — ₹499</button>
           </div>
 
           <div class="plan-card featured">
@@ -325,7 +325,7 @@
               <li><i class="fas fa-check"></i> No upfront commitment needed</li>
               <li><i class="fas fa-check"></i> Pay only when you do the work</li>
             </ul>
-            <button type="button" class="btn btn-primary">Active Plan</button>
+            <button type="button" class="btn btn-primary" id="planFlexBtn">Current Plan</button>
           </div>
 
           <div class="card mb-0">
@@ -351,9 +351,9 @@
 
         <!-- overlay badge -->
         <div class="plan-coming-soon">
-          <div class="plan-cs-icon">🚀</div>
-          <div class="plan-cs-title">Coming Soon</div>
-          <div class="plan-cs-sub">Plan management will be available in the next update</div>
+          <div class="plan-cs-icon">🔒</div>
+          <div class="plan-cs-title">Locked</div>
+          <div class="plan-cs-sub">Complete 3 happy jobs to unlock plan management</div>
         </div>
       </div><!-- end blur-wrap -->
     </div>
@@ -556,8 +556,102 @@
   </div>
 </div>
 
+<!-- ══ COMPLETION CODE MODAL ══ -->
+<div class="overlay" id="completionCodeOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="cc-header">
+      <div class="cc-header-title">Enter Customer Code</div>
+      <div class="cc-header-sub">Ask the customer for their code and enter it below to close this job.</div>
+    </div>
+    <div class="cc-otp-row">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 1" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 2" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 3" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 4" placeholder="·">
+    </div>
+    <div class="cc-actions">
+      <button type="button" class="btn-ghost" onclick="cancelCompletionCode()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="verifyCompletionCode()">✓ Verify &amp; Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SERVICE CHARGE MODAL ══ -->
+<div class="overlay" id="chargeOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sc-icon">💰</div>
+    <div class="sc-title">Upload Service Charge</div>
+    <div class="sc-sub">Enter the amount you collected from the customer.</div>
+
+    <div class="sc-amount-wrap">
+      <span class="sc-rupee">₹</span>
+      <input type="number" id="scAmountInput" class="sc-amount-input" placeholder="0" min="0" inputmode="decimal" aria-label="Service charge amount">
+    </div>
+
+    <div class="sc-label">Payment Method</div>
+    <div class="sc-method-row">
+      <button type="button" class="sc-method active" data-method="cash" onclick="selectMethod(this)">💵 Cash</button>
+      <button type="button" class="sc-method" data-method="upi" onclick="selectMethod(this)">📲 UPI</button>
+    </div>
+
+    <div class="sc-actions">
+      <button type="button" class="btn btn-primary" id="scSubmitBtn" onclick="submitServiceCharge()">Upload Charge</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUBSCRIPTION MODAL ══ -->
+<div class="overlay" id="subscriptionOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sub-badge">🎉 3 Free Jobs Done!</div>
+    <div class="sub-title">Choose a Plan to Continue</div>
+    <div class="sub-desc">You've completed your 3 free jobs. Subscribe to keep accepting new jobs.</div>
+
+    <div class="sub-plans">
+
+      <!-- FIX PLAN -->
+      <div class="sub-plan-card" id="fixPlanCard">
+        <div class="sub-plan-top">
+          <div class="sub-plan-name">Fix Plan</div>
+          <div class="sub-plan-price">₹499<span>/month</span></div>
+        </div>
+        <ul class="sub-plan-perks">
+          <li>✅ Unlimited job acceptance</li>
+          <li>✅ Valid for 30 days</li>
+          <li>✅ One-time monthly payment</li>
+        </ul>
+        <button type="button" class="sub-pay-btn" id="fixPayBtn" onclick="initiatePayment('fix')">
+          Pay ₹499 with Razorpay
+        </button>
+      </div>
+
+      <!-- FLEX PLAN -->
+      <div class="sub-plan-card sub-plan-flex" id="flexPlanCard">
+        <div class="sub-plan-top">
+          <div class="sub-plan-name">Flex Plan</div>
+          <div class="sub-plan-price">₹149<span>/job</span></div>
+        </div>
+        <ul class="sub-plan-perks">
+          <li>✅ Pay only when accepting</li>
+          <li>✅ No monthly commitment</li>
+          <li>✅ Best for occasional work</li>
+        </ul>
+        <button type="button" class="sub-pay-btn sub-pay-flex" id="flexPayBtn" onclick="initiatePayment('flex')">
+          Pay ₹149 with Razorpay
+        </button>
+      </div>
+
+    </div>
+    <button type="button" class="btn-ghost sub-later-btn" onclick="closeModal('subscriptionOverlay')">Maybe Later</button>
+  </div>
+</div>
+
 <div class="snackbar" id="snackbar"></div>
 
-<script src="tech.js?v=20260524"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="tech.js?v=20260601"></script>
 </body>
 </html>

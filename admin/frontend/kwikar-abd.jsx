@@ -96,11 +96,57 @@ function ABDDrawer({ abd, open, onClose, onAction }) {
   );
 }
 
+function AddABDModal({ open, onClose, onCreated }) {
+  const [form, setForm]   = useState({ name:'', phone:'', email:'', pin:'' });
+  const [err, setErr]     = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function set(k, v) { setForm(p => ({...p, [k]:v})); setErr(''); }
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!form.name || !form.phone || !form.pin) { setErr('Name, phone and PIN are required'); return; }
+    setSaving(true); setErr('');
+    try {
+      const res = await window.adminApi('create_abd', form);
+      if (res.status === 'success') { onCreated(); onClose(); setForm({ name:'', phone:'', email:'', pin:'' }); }
+      else setErr(res.message || 'Failed to create ABD');
+    } catch(e) { setErr('Server error'); }
+    setSaving(false);
+  }
+
+  if (!open) return null;
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
+      <div style={{ background:'#0D0E16', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16, width:440, padding:28, boxShadow:'0 24px 80px rgba(0,0,0,.8)' }} onClick={e=>e.stopPropagation()}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
+          <div style={{ fontFamily:'Space Grotesk', fontSize:16, fontWeight:700, color:'var(--text)' }}>Add New ABD</div>
+          <button className="kbtn" style={{ padding:'4px 8px' }} onClick={onClose}><Ico n="x" s={13}/></button>
+        </div>
+        <form onSubmit={submit} autoComplete="off" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {[{k:'name',l:'Full Name',t:'text',ph:'e.g. Rahul Sharma',ac:'off'},{k:'phone',l:'Phone Number',t:'tel',ph:'10-digit mobile number',ac:'off'},{k:'email',l:'Email (optional)',t:'text',ph:'rahul@example.com',ac:'off'},{k:'pin',l:'Login PIN (4-6 digits)',t:'password',ph:'Set a secure PIN',ac:'new-password'}].map(f=>(
+            <div key={f.k}>
+              <div style={{ fontSize:11, color:'var(--text3)', marginBottom:6, textTransform:'uppercase', letterSpacing:'.06em', fontWeight:600 }}>{f.l}</div>
+              <input className="kinput" type={f.t} placeholder={f.ph} value={form[f.k]} autoComplete={f.ac} onChange={e=>set(f.k,e.target.value)} style={{ width:'100%', height:40, background:'rgba(255,255,255,0.06)', color:'var(--text)' }}/>
+            </div>
+          ))}
+          {err && <div style={{ fontSize:12, color:'var(--red)', padding:'8px 12px', background:'rgba(248,113,113,.1)', borderRadius:8, border:'1px solid rgba(248,113,113,.3)' }}>{err}</div>}
+          <div style={{ display:'flex', gap:8, marginTop:4 }}>
+            <button type="button" className="kbtn" style={{ flex:1, justifyContent:'center' }} onClick={onClose}>Cancel</button>
+            <button type="submit" className="kbtn p" style={{ flex:1, justifyContent:'center' }} disabled={saving}>{saving ? 'Creating…' : 'Create ABD'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function ABDPage() {
   const [abds, setAbds]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [selected, setSelected]   = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addOpen, setAddOpen]     = useState(false);
   const [view, setView]           = useState('table');
 
   function load() {
@@ -142,9 +188,12 @@ function ABDPage() {
               <Ico n={v==='table'?'list':'award'} s={13}/>{v.charAt(0).toUpperCase()+v.slice(1)}
             </button>
           ))}
-          <button className="kbtn p" onClick={load}><Ico n="refresh" s={13}/>Refresh</button>
+          <button className="kbtn p" onClick={()=>setAddOpen(true)}><Ico n="plus" s={13}/>Add ABD</button>
+          <button className="kbtn" onClick={load}><Ico n="refresh" s={13}/>Refresh</button>
         </div>
       </div>
+
+      <AddABDModal open={addOpen} onClose={()=>setAddOpen(false)} onCreated={load}/>
 
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
         {[{l:'Total ABDs',v:totals.abds,c:'var(--cyan)',i:'briefcase'},{l:'Total Technicians',v:totals.techs,c:'var(--green)',i:'users'},{l:'Total Revenue',v:fCur(totals.revenue),c:'var(--amber)',i:'dollar'},{l:'Pincodes Covered',v:totals.pincodes,c:'var(--purple)',i:'mapPin'}].map(m=>(

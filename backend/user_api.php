@@ -263,7 +263,11 @@ if ($action === 'get_bookings') {
             p.pincode,
             b.created_at,
             tu.name              AS technician_name,
-            tu.phone             AS technician_phone
+            tu.phone             AS technician_phone,
+            CASE WHEN b.status IN ('accepted','assigned','arrived','ongoing')
+                 THEN b.happy_code ELSE NULL END AS happy_code,
+            CASE WHEN b.status IN ('accepted','assigned','arrived','ongoing')
+                 THEN b.sad_code   ELSE NULL END AS sad_code
         FROM   bookings b
         JOIN   customers c  ON b.customer_id = c.id
         JOIN   services  s  ON b.service_id  = s.id
@@ -398,6 +402,43 @@ if ($action === 'verify_user_pin') {
     if (empty($u['pass_pin']))                     { echo json_encode(['success' => false, 'error' => 'PIN set nahi hai']); exit; }
     if (!password_verify($pin, $u['pass_pin']))    { echo json_encode(['success' => false, 'error' => 'Galat PIN']); exit; }
     echo json_encode(['success' => true, 'user' => fetchUserRow($pdo, $phone)]);
+    exit;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// update_address
+// Updates (or creates) the default address for a customer.
+// ═══════════════════════════════════════════════════════════════
+if ($action === 'update_address') {
+    $phone   = trim($body['phone']   ?? '');
+    $address = trim($body['address'] ?? '');
+    $city    = trim($body['city']    ?? '');
+    $pincode = trim($body['pincode'] ?? '');
+
+    if (!$phone || !$address || !$city || !$pincode) {
+        echo json_encode(['success' => false, 'error' => 'All fields required']);
+        exit;
+    }
+
+    $st = $pdo->prepare("SELECT id FROM users WHERE phone = ? AND role = 'customer' LIMIT 1");
+    $st->execute([$phone]);
+    $userId = (int) $st->fetchColumn();
+
+    if (!$userId) {
+        echo json_encode(['success' => false, 'error' => 'User not found']);
+        exit;
+    }
+
+    $pincodeId = ensurePincode($pdo, $pincode, $city);
+    $pdo->prepare("UPDATE addresses SET is_default = 0 WHERE user_id = ?")->execute([$userId]);
+    $pdo->prepare("
+        INSERT INTO addresses (user_id, pincode_id, address_line, is_default)
+        VALUES (?, ?, ?, 1)
+        ON DUPLICATE KEY UPDATE address_line = VALUES(address_line), is_default = 1
+    ")->execute([$userId, $pincodeId, $address]);
+
+    log_info('Address updated', ['phone' => $phone]);
+    echo json_encode(['success' => true]);
     exit;
 }
 

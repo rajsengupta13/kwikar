@@ -127,6 +127,55 @@ input,textarea,select{font-family:inherit}
 .slot-item.selected .slot-radio{border-color:var(--blue);background:var(--blue)}
 .slot-item.selected .slot-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
 
+/* ── NOTIFY BANNER ── */
+.notify-banner{
+  display:flex;align-items:center;gap:12px;
+  background:linear-gradient(135deg,#0d1b3e,#1d4ed8);
+  border-radius:14px;padding:14px 16px;
+  box-shadow:0 6px 20px rgba(29,78,216,.35);
+}
+.notify-icon{font-size:1.5rem;flex-shrink:0}
+.notify-title{font-size:.95rem;font-weight:800;color:#fff;margin-bottom:2px}
+.notify-sub{font-size:.75rem;color:rgba(255,255,255,.75);line-height:1.4}
+
+/* ── BOOKING LOGIN MODAL ── */
+.bk-login-overlay{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(13,27,62,.65);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.bk-login-overlay.show{display:flex;animation:fadeIn .25s ease}
+.bk-login-sheet{
+  background:var(--white);border-radius:24px 24px 0 0;
+  padding:28px 20px calc(28px + var(--safe-bot));
+  width:100%;max-width:480px;
+  animation:slideUp .35s cubic-bezier(.2,1,.4,1) both;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.bk-login-badge{
+  display:inline-block;background:#fff3e0;color:#b45309;
+  font-size:.72rem;font-weight:700;border-radius:20px;
+  padding:4px 12px;margin-bottom:14px;
+}
+.bk-login-sheet h3{font-size:1.15rem;font-weight:800;color:var(--navy);margin-bottom:4px}
+.bk-login-sheet p{font-size:.82rem;color:var(--sub);margin-bottom:20px;line-height:1.5}
+.bk-login-input{
+  width:100%;height:50px;border:1.5px solid var(--border);border-radius:12px;
+  padding:0 14px;font-size:.95rem;color:var(--navy);background:var(--bg);
+  outline:none;transition:border .2s;margin-bottom:10px;font-family:inherit;
+}
+.bk-login-input:focus{border-color:var(--blue);background:var(--white);box-shadow:0 0 0 3px rgba(29,78,216,.1)}
+.bk-login-err{font-size:.78rem;color:var(--red);min-height:18px;margin-bottom:8px}
+.bk-login-btn{
+  width:100%;height:50px;background:linear-gradient(135deg,var(--navy),var(--blue));
+  color:var(--white);border:none;border-radius:12px;
+  font-size:1rem;font-weight:800;transition:all .2s;font-family:inherit;
+}
+.bk-login-btn:active{transform:scale(.98)}
+.bk-login-btn:disabled{opacity:.5;cursor:not-allowed}
+.bk-login-register{text-align:center;margin-top:14px;font-size:.8rem;color:var(--sub)}
+.bk-login-register a{color:var(--blue);font-weight:700;text-decoration:none}
+
 /* ── SLOT SKELETON ── */
 .slot-skeleton{cursor:default!important;pointer-events:none}
 .skel-line{border-radius:6px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
@@ -284,6 +333,15 @@ input,textarea,select{font-family:inherit}
 <!-- FIXED BOTTOM BUTTON -->
 <div class="bk-footer">
   <button class="bk-btn" id="mainBtn" onclick="handleContinue()">Continue →</button>
+  <div id="notifyBanner" style="display:none">
+    <div class="notify-banner">
+      <span class="notify-icon">🔔</span>
+      <div>
+        <div class="notify-title">You will be notified soon</div>
+        <div class="notify-sub">Jaise hi technician available hoga, aapko notify kar denge</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- POPUP: UNDERSTAND (2 sec) -->
@@ -348,6 +406,59 @@ input,textarea,select{font-family:inherit}
     <h3>Shukriya!</h3>
     <p>Aapka review humein bahut help karta hai. Hum jald hi aapke area mein service launch karenge!</p>
     <button class="r-close" onclick="window.location.href='index.html'">Go Back to Homepage →</button>
+  </div>
+</div>
+
+<!-- BOOKING LOGIN / REGISTER MODAL -->
+<div class="bk-login-overlay" id="bkLoginOverlay">
+  <div class="bk-login-sheet">
+    <div class="bk-login-badge">Booking ke liye zaroori</div>
+
+    <!-- ── LOGIN VIEW ── -->
+    <div id="bkLoginView">
+      <h3>Login Karo</h3>
+      <p>Time slot book karne ke liye pehle login karo</p>
+      <input class="bk-login-input" type="tel" id="bkLoginPhone" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number">
+      <input class="bk-login-input" type="tel" id="bkLoginPin" maxlength="4" inputmode="numeric" placeholder="4-digit PIN">
+      <div class="bk-login-err" id="bkLoginErr"></div>
+      <button class="bk-login-btn" id="bkLoginBtn" onclick="bkLoginSubmit()">Login Karo →</button>
+      <div class="bk-login-register">Naya account? <a href="javascript:void(0)" onclick="bkShowRegister()">Register karo</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 1: Name + Phone ── -->
+    <div id="bkRegStep1" style="display:none">
+      <h3>Register Karo</h3>
+      <p>Apna account banao aur booking karo</p>
+      <input class="bk-login-input" type="text"  id="bkRegName"  placeholder="Aapka naam *">
+      <input class="bk-login-input" type="tel"   id="bkRegPhone" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number *">
+      <input class="bk-login-input" type="email" id="bkRegEmail" placeholder="Email (optional)">
+      <div class="bk-login-err" id="bkRegErr1"></div>
+      <button class="bk-login-btn" onclick="bkRegNext1()">Continue →</button>
+      <div class="bk-login-register">Pehle se account hai? <a href="javascript:void(0)" onclick="bkShowLogin()">Login karo</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 2: Address ── -->
+    <div id="bkRegStep2" style="display:none">
+      <h3>Aapka Address</h3>
+      <p>Technician ko kahaan aana hai?</p>
+      <input class="bk-login-input" type="text" id="bkRegAddress" placeholder="Poora address (ghar no., gali, mohalla) *">
+      <input class="bk-login-input" type="text" id="bkRegCity"    placeholder="Shehar / area *">
+      <input class="bk-login-input" type="tel"  id="bkRegPincode" maxlength="6" inputmode="numeric" placeholder="6-digit pincode *">
+      <div class="bk-login-err" id="bkRegErr2"></div>
+      <button class="bk-login-btn" onclick="bkRegNext2()">Continue →</button>
+      <div class="bk-login-register"><a href="javascript:void(0)" onclick="bkRegBack1()">← Wapas jao</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 3: PIN ── -->
+    <div id="bkRegStep3" style="display:none">
+      <h3>PIN Set Karo</h3>
+      <p>Yeh 4-digit PIN login ke liye use hoga</p>
+      <input class="bk-login-input" type="tel" id="bkRegPin"        maxlength="4" inputmode="numeric" placeholder="4-digit PIN banao *">
+      <input class="bk-login-input" type="tel" id="bkRegPinConfirm" maxlength="4" inputmode="numeric" placeholder="PIN dobara daalo *">
+      <div class="bk-login-err" id="bkRegErr3"></div>
+      <button class="bk-login-btn" id="bkRegBtn" onclick="bkRegSubmit()">Register &amp; Book Karo →</button>
+      <div class="bk-login-register"><a href="javascript:void(0)" onclick="bkRegBack2()">← Wapas jao</a></div>
+    </div>
   </div>
 </div>
 
@@ -529,80 +640,34 @@ function buildSchedule() {
     chip.className = 'day-chip' + (i === 0 ? ' selected' : '');
     chip.innerHTML = `<div class="day-name">${i === 0 ? 'Aaj' : DAYS_SHORT[d.getDay()]}</div><div class="day-date">${d.getDate()} ${MONTHS[d.getMonth()]}</div>`;
     const dateStr = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    chip.onclick = (function(idx, ds) { return () => {
+    chip.onclick = (function(ds) { return () => {
       document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('selected'));
       chip.classList.add('selected');
       selectedDay = ds;
-      buildSlotsLoading();
-      fetchSlotAvailability(ds).then(() => buildSlots(idx === 0));
-    }; })(i, dateStr);
+      buildSlots();
+    }; })(dateStr);
     if (i === 0) selectedDay = dateStr;
     daysContainer.appendChild(chip);
   }
-  // Show skeleton while fetching, then build real slots
-  buildSlotsLoading();
-  fetchSlotAvailability(selectedDay).then(() => buildSlots(true));
+  buildSlots();
 }
 
-function buildSlots(isToday) {
+function buildSlots() {
   const list = document.getElementById('slotsList');
-  const now = new Date();
-  const curHour = now.getHours() + now.getMinutes() / 60;
   list.innerHTML = '';
   selectedSlot = '';
   document.getElementById('mainBtn').disabled = true;
 
-  const hasTechData = Object.keys(availabilityMap).length > 0;
-
-  let firstAvail = true;
+  // All slots are closed — high demand mode
   TIME_SLOTS.forEach(slot => {
-    const pastDeadline = isToday && curHour >= (slot.start - 1.5);
-    const apiInfo = availabilityMap[slot.label];
-
-    // Determine availability
-    let techUnavailable = false;
-    let availLabel = 'Available';
-    let availClass = '';
-
-    if (pastDeadline) {
-      techUnavailable = true;
-      availLabel = 'Available Nahi';
-      availClass = ' na';
-    } else if (hasTechData && apiInfo) {
-      if (!apiInfo.available) {
-        techUnavailable = true;
-        availLabel = 'Available Nahi';
-        availClass = ' na';
-      } else {
-        availLabel = apiInfo.count === 1
-          ? '1 Technician Available'
-          : `${apiInfo.count} Technicians Available`;
-        availClass = '';
-      }
-    }
-
-    const disabled = pastDeadline || techUnavailable;
     const item = document.createElement('div');
-    item.className = 'slot-item' + (disabled ? ' disabled' : '');
+    item.className = 'slot-item disabled';
     item.innerHTML = `
       <div>
         <div class="slot-time">${slot.label}</div>
-        <div class="slot-avail${availClass}">${availLabel}</div>
+        <div class="slot-avail na">Due to high demand all technician are busy now</div>
       </div>
       <div class="slot-radio"></div>`;
-
-    if (!disabled) {
-      item.onclick = () => {
-        document.querySelectorAll('.slot-item').forEach(s => s.classList.remove('selected'));
-        item.classList.add('selected');
-        selectedSlot = slot.label;
-        document.getElementById('mainBtn').disabled = false;
-      };
-      if (firstAvail) {
-        setTimeout(() => item.click(), 50);
-        firstAvail = false;
-      }
-    }
     list.appendChild(item);
   });
 }
@@ -623,10 +688,17 @@ function showStep(n) {
   currentStep = n;
   updateHeader();
   window.scrollTo(0,0);
-  const btn = document.getElementById('mainBtn');
-  if (n===1) { btn.textContent='Aage Bado →'; btn.disabled=false; }
-  else if (n===2) { btn.textContent='Time Confirm Karo →'; btn.disabled=!selectedSlot; }
-  else if (n===3) { btn.textContent='Book Karo 🚀'; btn.disabled=false; }
+  const btn    = document.getElementById('mainBtn');
+  const notify = document.getElementById('notifyBanner');
+  if (n === 2) {
+    btn.style.display    = 'none';
+    notify.style.display = '';
+  } else {
+    btn.style.display    = '';
+    notify.style.display = 'none';
+    if (n===1) { btn.textContent='Aage Bado →'; btn.disabled=false; }
+    else if (n===3) { btn.textContent='Book Karo 🚀'; btn.disabled=false; }
+  }
 }
 
 function goBack() {
@@ -639,6 +711,11 @@ function handleContinue() {
     if (!selectedIssue) { alert('Pehle ek problem select karo'); return; }
     if (selectedIssue === 'Other' && !document.getElementById('otherText').value.trim()) {
       alert('Apni problem thodi detail mein batao'); return;
+    }
+    // Gate: must be logged in before seeing time slots
+    if (!localStorage.getItem('kwikar_user')) {
+      openBkLoginModal();
+      return;
     }
     showUnderstandPopup();
   } else if (currentStep === 2) {
@@ -752,6 +829,165 @@ async function saveFeedback(wants) {
 
 function showOverlay(id) { document.getElementById(id).classList.add('show'); }
 function hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
+
+/* ── BOOKING LOGIN / REGISTER MODAL ── */
+function _bkShow(id) {
+  ['bkLoginView','bkRegStep1','bkRegStep2','bkRegStep3'].forEach(v =>
+    document.getElementById(v).style.display = v === id ? '' : 'none'
+  );
+}
+
+function openBkLoginModal() {
+  document.getElementById('bkLoginPhone').value = '';
+  document.getElementById('bkLoginPin').value   = '';
+  document.getElementById('bkLoginErr').textContent = '';
+  _bkShow('bkLoginView');
+  document.getElementById('bkLoginOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('bkLoginPhone').focus(), 300);
+}
+
+function closeBkLoginModal() {
+  document.getElementById('bkLoginOverlay').classList.remove('show');
+}
+
+function bkShowRegister() {
+  ['bkRegName','bkRegPhone','bkRegEmail','bkRegAddress','bkRegCity','bkRegPincode','bkRegPin','bkRegPinConfirm']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  ['bkRegErr1','bkRegErr2','bkRegErr3'].forEach(id => { document.getElementById(id).textContent = ''; });
+  // Pre-fill pincode from welcome pin if saved
+  const savedPin = localStorage.getItem('kwikar_welcome_pin');
+  if (savedPin) document.getElementById('bkRegPincode').value = savedPin;
+  _bkShow('bkRegStep1');
+  setTimeout(() => document.getElementById('bkRegName').focus(), 100);
+}
+
+function bkShowLogin() {
+  document.getElementById('bkLoginErr').textContent = '';
+  _bkShow('bkLoginView');
+  setTimeout(() => document.getElementById('bkLoginPhone').focus(), 100);
+}
+
+// ── LOGIN submit ──
+async function bkLoginSubmit() {
+  const phone = document.getElementById('bkLoginPhone').value.trim().replace(/\D/g,'').slice(-10);
+  const pin   = document.getElementById('bkLoginPin').value.trim();
+  const err   = document.getElementById('bkLoginErr');
+  const btn   = document.getElementById('bkLoginBtn');
+  if (!/^\d{10}$/.test(phone)) { err.textContent = 'Sahi 10-digit number daalo'; return; }
+  if (!/^\d{4}$/.test(pin))    { err.textContent = '4-digit PIN daalo'; return; }
+  err.textContent = '';
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Verifying…';
+  try {
+    const res  = await fetch(_BASE + '/backend/user_api.php?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin })
+    });
+    const data = await res.json();
+    if (!data.success) { err.textContent = data.error || 'Phone ya PIN galat hai'; return; }
+    const u = { ...(data.user || {}), role: 'user' };
+    localStorage.setItem('kwikar_user', JSON.stringify(u));
+    userName  = u.name  || '';
+    userPhone = u.phone || phone;
+    if (u.address && !document.getElementById('fullAddress').value)
+      document.getElementById('fullAddress').value = u.address;
+    if (u.pincode && !document.getElementById('pincode').value)
+      document.getElementById('pincode').value = u.pincode;
+    closeBkLoginModal();
+    showUnderstandPopup();
+  } catch(e) {
+    err.textContent = 'Server se connect nahi ho paya — dobara try karo';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// ── REGISTER step 1 ──
+function bkRegNext1() {
+  const name  = document.getElementById('bkRegName').value.trim();
+  const phone = document.getElementById('bkRegPhone').value.trim();
+  const err   = document.getElementById('bkRegErr1');
+  if (!name)                       { err.textContent = 'Naam daalna zaroori hai'; return; }
+  if (!/^\d{10}$/.test(phone))     { err.textContent = 'Sahi 10-digit number daalo'; return; }
+  err.textContent = '';
+  _bkShow('bkRegStep2');
+  setTimeout(() => document.getElementById('bkRegAddress').focus(), 100);
+}
+
+function bkRegBack1() { _bkShow('bkRegStep1'); }
+
+// ── REGISTER step 2 ──
+function bkRegNext2() {
+  const address = document.getElementById('bkRegAddress').value.trim();
+  const city    = document.getElementById('bkRegCity').value.trim();
+  const pincode = document.getElementById('bkRegPincode').value.trim();
+  const err     = document.getElementById('bkRegErr2');
+  if (!address)                     { err.textContent = 'Address daalna zaroori hai'; return; }
+  if (!city)                        { err.textContent = 'Shehar ka naam daalo'; return; }
+  if (!/^\d{6}$/.test(pincode))     { err.textContent = '6-digit pincode daalo'; return; }
+  err.textContent = '';
+  document.getElementById('bkRegPin').value = '';
+  document.getElementById('bkRegPinConfirm').value = '';
+  document.getElementById('bkRegErr3').textContent = '';
+  _bkShow('bkRegStep3');
+  setTimeout(() => document.getElementById('bkRegPin').focus(), 100);
+}
+
+function bkRegBack2() { _bkShow('bkRegStep2'); }
+
+// ── REGISTER step 3 (final submit) ──
+async function bkRegSubmit() {
+  const pin        = document.getElementById('bkRegPin').value.trim();
+  const pinConfirm = document.getElementById('bkRegPinConfirm').value.trim();
+  const err        = document.getElementById('bkRegErr3');
+  const btn        = document.getElementById('bkRegBtn');
+  if (!/^\d{4}$/.test(pin))      { err.textContent = '4-digit PIN daalo'; return; }
+  if (pin !== pinConfirm)         { err.textContent = 'Dono PIN match nahi kar rahe'; return; }
+  err.textContent = '';
+
+  const name    = document.getElementById('bkRegName').value.trim();
+  const phone   = document.getElementById('bkRegPhone').value.trim().replace(/\D/g,'').slice(-10);
+  const email   = document.getElementById('bkRegEmail').value.trim();
+  const address = document.getElementById('bkRegAddress').value.trim();
+  const city    = document.getElementById('bkRegCity').value.trim();
+  const pincode = document.getElementById('bkRegPincode').value.trim();
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    const res  = await fetch(_BASE + '/backend/user_api.php?action=register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, email, address, city, pincode, pin, role: 'user' })
+    });
+    const data = await res.json();
+    if (!data.success) { err.textContent = data.error || 'Register nahi ho paya'; return; }
+    const u = { name, phone, email, address, city, pincode, role: 'user',
+                user_id: data.user?.id || '' };
+    localStorage.setItem('kwikar_user', JSON.stringify(u));
+    localStorage.setItem('kwikar_pin_done', '1');
+    userName  = name;
+    userPhone = phone;
+    // Pre-fill address step
+    if (!document.getElementById('fullAddress').value) document.getElementById('fullAddress').value = address;
+    if (!document.getElementById('pincode').value)     document.getElementById('pincode').value     = pincode;
+    closeBkLoginModal();
+    showUnderstandPopup();
+  } catch(e) {
+    err.textContent = 'Server se connect nahi ho paya — dobara try karo';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// Keyboard shortcuts
+document.getElementById('bkLoginPin').addEventListener('keydown',      e => { if (e.key === 'Enter') bkLoginSubmit(); });
+document.getElementById('bkLoginPhone').addEventListener('keydown',    e => { if (e.key === 'Enter') document.getElementById('bkLoginPin').focus(); });
+document.getElementById('bkRegPin').addEventListener('keydown',        e => { if (e.key === 'Enter') document.getElementById('bkRegPinConfirm').focus(); });
+document.getElementById('bkRegPinConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') bkRegSubmit(); });
 
 updateHeader();
 init();
