@@ -1,0 +1,3 @@
+[2026-05-24 11:12:01] [INFO] Pincode checked | {"pincode":"812006","available":true} | IP:::1 POST /mono-kwikar/backend/booking_api.php
+[2026-05-24 11:12:14] [INFO] User logged in | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=login
+[2026-05-24 11:12:38] [INFO] Booking created | {"booking_id":5,"booking_code":"525A04D4","user_id":15,"phone":"9534862453","service":"ac","pincode":"812006","broadcasts":2} | IP:::1 POST /mono-kwikar/backend/booking_api.php

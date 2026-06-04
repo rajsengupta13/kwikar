@@ -4,7 +4,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\xampp\\\\htdocs\\\\technician2\" -Recurse -Force)",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
-      "Bash(Get-ChildItem -Path \"C:\\\\xampp\\\\htdocs\\\\mono-kwikar\\\\technician\" -Recurse)"
+      "Bash(Get-ChildItem -Path \"C:\\\\xampp\\\\htdocs\\\\mono-kwikar\\\\technician\" -Recurse)",
+      "PowerShell(head -150)"
     ]
   }
 }

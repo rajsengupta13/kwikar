@@ -1,0 +1,7 @@
+[2026-06-01 11:06:59] [INFO] User logged in | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=login
+[2026-06-01 11:27:18] [INFO] User logged in | {"phone":"9534862453","user_id":15} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=login
+[2026-06-01 11:30:15] [INFO] Address updated | {"phone":"9534862453"} | IP:::1 POST /mono-kwikar/backend/user_api.php?action=update_address
+[2026-06-01 12:03:55] [INFO] Site review saved | {"id":1,"rating":3} | IP:::1 POST /mono-kwikar/backend/review_api.php
+[2026-06-01 12:14:46] [INFO] Site review saved | {"id":2,"rating":4} | IP:::1 POST /mono-kwikar/backend/review_api.php
+[2026-06-01 12:15:09] [INFO] Site review saved | {"id":3,"rating":4} | IP:::1 POST /mono-kwikar/backend/review_api.php
+[2026-06-01 12:21:47] [INFO] Site review saved | {"id":4,"rating":4} | IP:::1 POST /mono-kwikar/backend/review_api.php

@@ -156,7 +156,7 @@ button{font-family:inherit}
 @keyframes scrollP{0%,100%{transform:translateY(0);opacity:1}50%{transform:translateY(6px);opacity:.3}}
 
 /* ══ SERVICES GRID (NEW — "Kya Chahiye Aapko?") ══ */
-.live-ticker{height:36px;display:flex;align-items:center;overflow:hidden;background:linear-gradient(90deg,#dce8ff,#ecf2ff);margin-top:64px}.ticker-inner{display:flex;align-items:center;gap:14px;animation:tickerRoll 70s linear infinite;padding:0 31px;height:100%;width:max-content;min-width:max-content;backface-visibility:hidden;will-change:transform}.ticker-card{flex:0 0 auto;background:#fff;border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:700;color:#0d1b3e;white-space:nowrap;box-shadow:0 1px 4px rgba(13,27,62,.1);border:1px solid rgba(13,27,62,.1)}@keyframes tickerRoll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}@media(max-width:640px){.live-ticker{position:fixed;top:calc(52px + var(--safe-top));left:0;right:0;z-index:299;margin-top:0;height:32px}.ticker-inner{animation-duration:95s;padding:0 16px}.ticker-card{font-size:.67rem;padding:4px 12px}}
+.live-ticker{height:36px;display:flex;align-items:center;overflow:hidden;background:linear-gradient(90deg,#dce8ff,#ecf2ff);margin-top:64px}.ticker-inner{display:flex;align-items:center;gap:14px;animation:tickerRoll 70s linear infinite;padding:0 31px;height:100%;width:max-content;min-width:max-content;backface-visibility:hidden;will-change:transform}.ticker-card{flex:0 0 auto;background:#fff;border-radius:20px;padding:5px 14px;font-size:.78rem;font-weight:700;color:#0d1b3e;white-space:nowrap;box-shadow:0 1px 4px rgba(13,27,62,.1);border:1px solid rgba(13,27,62,.1)}@keyframes tickerRoll{0%{transform:translate3d(0,0,0)}100%{transform:translate3d(-50%,0,0)}}@media(max-width:640px){.live-ticker{position:fixed;top:calc(48px + var(--safe-top));left:0;right:0;z-index:299;margin-top:0;height:32px}.ticker-inner{animation-duration:220s;padding:0 16px}.ticker-card{font-size:.67rem;padding:4px 12px}}
 
 
 
@@ -1683,7 +1683,7 @@ body.modal-open{overflow:hidden}
 .brands-sec .text-c{padding:0 5%;margin-bottom:10px}
 .brands-label{display:inline-block;background:#fff3e0;color:#e65c00;font-size:.66rem;font-weight:800;padding:3px 11px;border-radius:20px;margin-bottom:10px;letter-spacing:.05em;text-transform:uppercase}
 .brands-h{font-size:.95rem;font-weight:800;color:#0d1b3e;line-height:1.4;margin-bottom:0}
-.brand-ticker-wrap{display:flex;flex-direction:column;gap:6px}
+.brand-ticker-wrap{display:flex;flex-direction:column;gap:9px}
 .brand-ticker-row{overflow:hidden;width:100%;-webkit-mask-image:linear-gradient(to right,transparent 0%,#000 8%,#000 92%,transparent 100%);mask-image:linear-gradient(to right,transparent 0%,#000 8%,#000 92%,transparent 100%)}
 .brand-ticker-track{display:flex;gap:7px;width:max-content;will-change:transform}
 .brand-rtl{animation:brandRTL 32s linear infinite}
