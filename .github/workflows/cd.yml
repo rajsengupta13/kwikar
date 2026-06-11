@@ -49,8 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Check out the exact commit that landed on `production`
-          # (the PR's merge commit), not a transient PR merge ref.
           ref: ${{ github.event.pull_request.merge_commit_sha || 'production' }}
 
       - name: Lint PHP on the exact commit being shipped (final safety net — full CI already ran on the PR)
@@ -89,7 +87,7 @@ jobs:
           echo "port=$port"   >> "$GITHUB_OUTPUT"
 
       - name: Deploy via rsync/SSH
-        uses: easingthemes/ssh-deploy@v5
+        uses: easingthemes/ssh-deploy@v5.1.2
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           REMOTE_HOST: ${{ steps.ssh.outputs.host }}
