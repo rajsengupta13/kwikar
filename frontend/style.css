@@ -1398,7 +1398,7 @@ body.modal-open{overflow:hidden}
   .mobile-topbar{padding: calc(11px + var(--safe-top)) 4px 4px;}
   .mtb-row1{margin-bottom:8px;gap:8px}
   .mtb-logo{font-size:1.35rem}
-  .mtb-join{padding:7px 12px;font-size:.68rem}
+  .mtb-join{padding:20px 12px;font-size:.68rem}
   .mtb-actions{gap:6px}
   .mtb-iconbtn{width:34px;height:34px;font-size:.85rem}
   .mtb-burger-lines span{width:13px}
