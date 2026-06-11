@@ -22,9 +22,19 @@ RewriteRule ^ - [L]
 # 2. /api/<name>  →  /backend/api/<name>.php
 RewriteRule ^api/([A-Za-z0-9_-]+)/?$ backend/api/$1.php [L,QSA]
 
-# 3. Everything else (relative asset paths, missing files) is served
+# 3. Clean URLs for legal pages — files live in frontend/legal/
+RewriteRule ^privacy-policy/?$ frontend/legal/privacy-policy.html [L]
+RewriteRule ^terms-and-conditions/?$ frontend/legal/terms-and-conditions.html [L]
+RewriteRule ^refund-policy/?$ frontend/legal/refund-policy.html [L]
+RewriteRule ^contact-us/?$ frontend/legal/contact-us.html [L]
+
+# 4. Everything else (relative asset paths, missing files) is served
 #    from the frontend/ folder. Internal rewrite — URL does not change.
 RewriteRule ^(.*)$ frontend/$1 [L]
+
+# Video MIME types — required for browser playback and byte-range streaming
+AddType video/mp4 .mp4
+AddType video/webm .webm
 
 # Force UTF-8 for served HTML/CSS/JS
 AddDefaultCharset UTF-8
@@ -37,10 +47,12 @@ AddDefaultCharset UTF-8
   ExpiresByType image/svg+xml "access plus 30 days"
   ExpiresByType text/css "access plus 7 days"
   ExpiresByType application/javascript "access plus 7 days"
-  ExpiresByType application/manifest+json "access plus 7 days"
+  ExpiresByType application/manifest+json "access plus 0 seconds"
 </IfModule>
 
-# Service workers must always be re-validated; never cache stale.
-<FilesMatch "sw\.js$">
+# Service workers and manifest must always be re-validated — never serve stale.
+<FilesMatch "(sw\.js|manifest\.json)$">
   Header set Cache-Control "no-cache, no-store, must-revalidate"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
 </FilesMatch>

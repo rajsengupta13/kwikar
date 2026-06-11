@@ -7,21 +7,19 @@
      • Form data      → Background Sync queue
 ═══════════════════════════════════════════════ */
 
-const CACHE_STATIC  = 'kwikar-static-v1';
-const CACHE_IMAGES  = 'kwikar-images-v1';
-const CACHE_PAGES   = 'kwikar-pages-v1';
+const CACHE_STATIC  = 'kwikar-static-v1.7.1';
+const CACHE_IMAGES  = 'kwikar-images-v1.7.1';
+const CACHE_PAGES   = 'kwikar-pages-v1.7.1';
 const ALL_CACHES    = [CACHE_STATIC, CACHE_IMAGES, CACHE_PAGES];
-const OFFLINE_URL   = '/offline.html';
+const OFFLINE_URL   = 'offline.html';
 
+const BASE = self.registration.scope;
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
+  BASE + 'index.html',
+  BASE + 'offline.html',
+  BASE + 'manifest.json',
 ];
+const OFFLINE_FULL_URL = BASE + OFFLINE_URL;
 
 /* ── INSTALL ── */
 self.addEventListener('install', event => {
@@ -55,7 +53,7 @@ self.addEventListener('fetch', event => {
   // ── Images (Unsplash + icons) → Stale While Revalidate
   if (
     url.hostname.includes('unsplash.com') ||
-    url.pathname.startsWith('/icons/')
+    url.pathname.startsWith('/images/icons/')
   ) {
     event.respondWith(staleWhileRevalidate(request, CACHE_IMAGES));
     return;
@@ -115,12 +113,15 @@ async function networkFirstWithOffline(request) {
     if (response.ok) {
       const cache = await caches.open(CACHE_PAGES);
       cache.put(request, response.clone());
+      return response;
     }
-    return response;
+    // Server returned an error (4xx / 5xx) — fall through to cache so the
+    // user never sees a raw Apache error page inside the PWA.
+    throw new Error('non-ok response: ' + response.status);
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
-    const offlinePage = await caches.match(OFFLINE_URL);
+    const offlinePage = await caches.match(OFFLINE_FULL_URL);
     return offlinePage || new Response('<h1>You are offline</h1>', { headers: { 'Content-Type': 'text/html' } });
   }
 }
@@ -148,15 +149,15 @@ self.addEventListener('push', event => {
   const data = event.data?.json() || {
     title: 'Kwikar',
     body: 'We are launching in Bhagalpur soon! 🚀',
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-72.png',
+    icon: '/images/icons/icon-192.png',
+    badge: '/images/icons/icon-72.png',
   };
 
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: data.icon || '/icons/icon-192.png',
-      badge: data.badge || '/icons/icon-72.png',
+      icon: data.icon || '/images/icons/icon-192.png',
+      badge: data.badge || '/images/icons/icon-72.png',
       tag: 'kwikar-notification',
       renotify: true,
       data: { url: data.url || '/' },

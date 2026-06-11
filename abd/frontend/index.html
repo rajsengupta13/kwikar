@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Kwikar — ABD Panel</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #ff5a1f;
+      --orange-dim: rgba(255,90,31,0.08);
+      --orange-mid: rgba(255,90,31,0.18);
+      --sidebar-bg: #0d1117;
+      --page-bg: #f4f3f0;
+      --card-bg: #ffffff;
+      --border: rgba(0,0,0,0.06);
+      --text-1: #0f172a;
+      --text-2: #475569;
+      --text-3: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --warning: #f59e0b;
+      --purple: #8b5cf6;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+      --shadow-lg: 0 20px 48px rgba(0,0,0,0.10);
+      --radius: 12px;
+    }
+
+    html, body, #root {
+      height: 100%;
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--page-bg);
+      color: var(--text-1);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(40px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    table { border-collapse: collapse; }
+    th, td { font-family: 'Manrope', sans-serif; }
+
+    input, button, select, textarea { font-family: 'Manrope', sans-serif; }
+    input:focus { outline: none; }
+    button:focus { outline: none; }
+
+    button, a, [role="button"] { transition: opacity 0.15s, transform 0.15s, background 0.15s, box-shadow 0.15s; }
+
+    p, span, div { text-wrap: pretty; }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+
+    .abd-menu-btn,
+    .abd-navbar-mobile-brand,
+    .abd-navbar-mobile-greeting,
+    .abd-drawer-close,
+    .abd-sidebar-backdrop,
+    .abd-bottom-nav { display: none; }
+
+    @media (max-width: 900px) {
+      html, body, #root { height: 100%; overflow: hidden; }
+
+      .abd-app {
+        min-height: 100svh !important;
+        height: 100svh;
+        overflow: hidden;
+      }
+
+      .abd-main { width: 100%; }
+
+      .abd-scroll {
+        padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+        overflow-x: hidden !important;
+        overscroll-behavior-y: contain;
+      }
+
+      .abd-scroll > div {
+        padding: 16px 14px !important;
+      }
+
+      .abd-sidebar {
+        position: fixed !important;
+        inset: 0 auto 0 0;
+        width: min(72vw, 220px) !important;
+        z-index: 300 !important;
+        transform: translateX(-105%);
+        transition: transform 0.24s ease, width 0.24s ease !important;
+        box-shadow: 20px 0 48px rgba(15,23,42,0.32);
+      }
+
+      /* Tighter padding inside the drawer on mobile */
+      .abd-sidebar .abd-sidebar-head > div:first-child {
+        padding: 16px 14px !important;
+      }
+
+      /* Collapse button — hide it in drawer mode (not useful on mobile) */
+      .abd-sidebar > button:last-child {
+        display: none !important;
+      }
+
+      /* Nav items: reduce horizontal padding to fit 220px */
+      .abd-sidebar div[style*="padding: 13px 20px"],
+      .abd-sidebar div[style*="padding:13px 20px"] {
+        padding: 12px 14px !important;
+      }
+
+      /* Section label rows */
+      .abd-sidebar div[style*="padding: 12px 20px"],
+      .abd-sidebar div[style*="padding:12px 20px"] {
+        padding: 10px 14px 4px !important;
+      }
+
+      /* User card at the bottom */
+      .abd-sidebar > div[style*="margin:\"0 8px 8px\""],
+      .abd-sidebar > div:nth-last-child(2) {
+        margin: 0 6px 6px !important;
+        padding: 10px 12px !important;
+      }
+
+      .abd-sidebar.is-open { transform: translateX(0); }
+
+      .abd-sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,0.42);
+        z-index: 250;
+      }
+
+      .abd-sidebar-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .abd-drawer-close {
+        display: flex;
+        width: 38px;
+        height: 38px;
+        margin-right: 12px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.05);
+        color: #cbd5e1;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .abd-navbar {
+        height: 60px !important;
+        padding: 12px !important;
+        gap: 8px !important;
+        align-items: center !important;
+        border-bottom: 0 !important;
+        box-shadow: 0 10px 26px rgba(15,23,42,0.08) !important;
+        width: 100% !important;
+      }
+
+      .abd-menu-btn {
+        display: flex;
+        width: 36px;
+        height: 36px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        color: #475569;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+      }
+
+      .abd-navbar-mobile-brand {
+        display: block;
+        flex: 1 1 auto;
+        min-width: 70px;
+        overflow: hidden;
+      }
+
+      .abd-mobile-brand-name {
+        font-size: 15px;
+        line-height: 1.05;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+      }
+
+      .abd-mobile-brand-name::first-letter {
+        color: #1d4ed8;
+      }
+
+      .abd-mobile-brand-sub {
+        margin-top: 3px;
+        font-size: 12px;
+        line-height: 1.1;
+        font-weight: 600;
+        color: #94a3b8;
+        white-space: nowrap;
+      }
+
+      .abd-navbar-title {
+        display: none !important;
+      }
+
+      .abd-navbar h1 {
+        font-size: 18px !important;
+        line-height: 1.12 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .abd-navbar p {
+        font-size: 12px !important;
+        line-height: 1.25 !important;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .abd-navbar-search,
+      .abd-navbar-spacer,
+      .abd-navbar-live,
+      .abd-navbar-earnings,
+      .abd-navbar-profile {
+        display: none !important;
+      }
+
+      .abd-navbar-notif {
+        flex: 0 0 auto !important;
+      }
+
+      .abd-navbar-icon-btn {
+        width: 36px !important;
+        height: 36px !important;
+        border: 0 !important;
+        border-radius: 10px !important;
+        background: #f8fafc !important;
+        color: #475569 !important;
+      }
+
+      /* Greeting pill */
+      .abd-navbar-mobile-greeting {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+        width: 136px;
+        height: 36px;
+        padding: 4px 10px 4px 4px;
+        border: 0;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #475569;
+        font: inherit;
+        cursor: pointer;
+        flex-shrink: 0;
+        /* Force compositing layer — makes overflow:hidden clip CSS transforms */
+        transform: translateZ(0);
+        isolation: isolate;
+      }
+
+      .abd-mobile-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #3157c9;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        font-size: 11px;
+        font-weight: 900;
+        overflow: hidden;
+        border: 2px solid #fff;
+        box-shadow: 0 1px 4px rgba(15,23,42,0.14);
+      }
+
+      .abd-mobile-avatar img {
+        width: 100%; height: 100%;
+        object-fit: cover; display: block;
+      }
+
+      /* Clip wrapper — this is what actually constrains the marquee */
+      .abd-mobile-greeting-clip {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        transform: translateZ(0); /* own compositing layer */
+      }
+
+      /* Sliding marquee — bounces left then right */
+      @keyframes greet-marquee {
+        0%,  20% { transform: translateX(0); }
+        75%, 100% { transform: translateX(calc(-1 * var(--greet-slide, 0px))); }
+      }
+
+      .abd-mobile-greeting-text {
+        display: inline-block;
+        white-space: nowrap;
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+        animation: greet-marquee 3s ease-in-out infinite alternate;
+      }
+
+      .abd-navbar-dropdown {
+        position: fixed !important;
+        top: 76px !important;
+        right: 12px !important;
+        width: calc(100vw - 24px) !important;
+        max-width: 360px !important;
+      }
+
+      .abd-bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 220;
+        height: calc(64px + env(safe-area-inset-bottom, 0px));
+        padding: 4px 4px env(safe-area-inset-bottom, 0px);
+        background: #fff;
+        border-top: 1px solid #e8edf2;
+        box-shadow: 0 -8px 30px rgba(15,23,42,0.08);
+        display: flex;
+      }
+
+      .abd-bottom-nav button {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        color: #94a3b8;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .abd-bottom-nav button.active { color: #ff5a1f; }
+      .abd-bottom-nav button:active svg { transform: scale(0.9); }
+
+      /* ── Stat-card grids (3/4/5 cols) → 2 cols on mobile ── */
+      .abd-scroll div[style*="grid-template-columns:repeat(3,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(3,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(3, 1fr)"],
+      .abd-scroll div[style*="grid-template-columns:repeat(4,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(4,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(4, 1fr)"],
+      .abd-scroll div[style*="grid-template-columns:repeat(5,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(5,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(5, 1fr)"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+      }
+
+      /* ── Content layouts → single column ── */
+      .abd-scroll div[style*="grid-template-columns:1fr 1fr 1fr"],
+      .abd-scroll div[style*="grid-template-columns: 1fr 1fr 1fr"],
+      .abd-scroll div[style*="grid-template-columns:1fr 340px"],
+      .abd-scroll div[style*="grid-template-columns: 1fr 340px"],
+      .abd-scroll div[style*="grid-template-columns:320px 1fr"],
+      .abd-scroll div[style*="grid-template-columns: 320px 1fr"],
+      .abd-scroll div[style*="grid-template-columns:1fr 1fr"],
+      .abd-scroll div[style*="grid-template-columns: 1fr 1fr"],
+      .abd-scroll div[style*="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr))"],
+      .abd-scroll div[style*="repeat(auto-fill,minmax(340px,1fr))"] {
+        grid-template-columns: 1fr !important;
+      }
+
+      /* ── Section headers: wrap title + action buttons ── */
+      .abd-scroll div[style*="justify-content:space-between"],
+      .abd-scroll div[style*="justify-content: space-between"] {
+        flex-wrap: wrap;
+        gap: 10px;
+        max-width: 100%;
+      }
+
+      .abd-scroll > div > div:first-child {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      /* ── Typography ── */
+      .abd-scroll h2 { font-size: 17px !important; }
+      .abd-scroll h3 { font-size: 13px !important; }
+      .abd-scroll p  { font-size: 12px !important; }
+
+      /* ── Tap targets ── */
+      .abd-scroll button { min-height: 36px; }
+
+      /* ── Tables: horizontal scroll ── */
+      .abd-scroll table {
+        display: block;
+        width: 100% !important;
+        min-width: 640px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+      }
+
+      .abd-scroll th, .abd-scroll td { padding: 10px 12px !important; }
+
+      /* ── Charts: constrain to container width ── */
+      .abd-scroll svg[width="900"],
+      .abd-scroll svg[width="600"],
+      .abd-scroll svg[width="580"] {
+        max-width: 100%;
+        height: auto;
+      }
+
+      /* ── Notification dropdown: full-width on mobile ── */
+      /* ── Contain horizontal chart scroll within the card ── */
+      .abd-scroll > div div[style*="overflow-x: auto"] {
+        overscroll-behavior-x: contain;
+      }
+
+      .abd-profile-page {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 16px 14px calc(88px + env(safe-area-inset-bottom, 0px)) !important;
+        overflow-x: hidden !important;
+      }
+
+      .abd-profile-page *,
+      .abd-profile-grid,
+      .abd-profile-grid > div {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .abd-profile-grid,
+      .abd-profile-info-grid,
+      .abd-profile-pincode-form {
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+      }
+
+      .abd-profile-pincode-form button {
+        width: 100%;
+      }
+
+      .abd-profile-page input {
+        width: 100% !important;
+      }
+    }
+
+    /* ── Very small phones (<= 480px): collapse 2-col to 1-col ── */
+    @media (max-width: 480px) {
+      .abd-scroll > div { padding: 14px 12px !important; }
+
+      .abd-profile-page {
+        padding: 14px 12px calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+      }
+
+      .abd-profile-page > div:first-child {
+        margin-bottom: 14px !important;
+      }
+
+      .abd-scroll div[style*="grid-template-columns:repeat(3,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(3,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(3, 1fr)"],
+      .abd-scroll div[style*="grid-template-columns:repeat(4,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(4,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(4, 1fr)"],
+      .abd-scroll div[style*="grid-template-columns:repeat(5,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(5,1fr)"],
+      .abd-scroll div[style*="grid-template-columns: repeat(5, 1fr)"] {
+        grid-template-columns: 1fr !important;
+      }
+
+      .abd-scroll div[style*="padding:20px 22px"],
+      .abd-scroll div[style*="padding: 20px 22px"],
+      .abd-scroll div[style*="padding:24px 26px"],
+      .abd-scroll div[style*="padding: 24px 26px"],
+      .abd-scroll div[style*="padding:28px 32px"],
+      .abd-scroll div[style*="padding: 28px 32px"] {
+        padding: 14px !important;
+      }
+
+      .abd-scroll div[style*="gap:24px"],
+      .abd-scroll div[style*="gap: 24px"],
+      .abd-scroll div[style*="gap:20px"],
+      .abd-scroll div[style*="gap: 20px"],
+      .abd-scroll div[style*="gap:16px"],
+      .abd-scroll div[style*="gap: 16px"] {
+        gap: 10px !important;
+      }
+
+      .abd-scroll [style*="width:300px"],
+      .abd-scroll [style*="width: 300px"] { width: 100% !important; }
+
+      /* Wallet card text scale */
+      .abd-scroll div[style*="font-size:34px"],
+      .abd-scroll div[style*="font-size: 34px"] { font-size: 24px !important; }
+
+      .abd-scroll div[style*="font-size:24px"],
+      .abd-scroll div[style*="font-size: 24px"] { font-size: 18px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Data — v5 forces browser to reload, bypassing cache -->
+  <script src="kwikar-data.js?v=22"></script>
+
+  <!-- Components: load order matters — each builds on the previous -->
+  <script type="text/babel" src="kwikar-ui.jsx?v=22"></script>
+  <script type="text/babel" src="tweaks-panel.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-sidebar.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-tree.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pages-a.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pages-b.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-pincodes.jsx?v=22"></script>
+  <script type="text/babel" src="kwikar-app.jsx?v=22"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js?v=22')
+          .then(function(reg) { console.log('ABD SW registered:', reg.scope); })
+          .catch(function(err) { console.warn('ABD SW registration failed:', err); });
+      });
+    }
+  </script>
+</body>
+</html>
