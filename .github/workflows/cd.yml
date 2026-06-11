@@ -96,20 +96,4 @@ jobs:
           SOURCE: "./"
           TARGET: ${{ vars.SSH_TARGET_DIR || '~/public_html/' }}
           ARGS: "-rlgoDzvc -i --delete"
-          EXCLUDE: |
-            .git/
-            .github/
-            .claude/
-            .vscode/
-            backend/logs/
-            backend/data/*.json
-            .env.example
-            .gitignore
-            .dockerignore
-            Dockerfile
-            docker-compose.yml
-            *.md
-            new_schema.sql
-            backend/schema.sql
-            backend/kwikar.sql
-            admin/backend/seed_admin.php
+          EXCLUDE: ".git/,.github/,.claude/,.vscode/,backend/logs/,backend/data/*.json,.env.example,.gitignore,.dockerignore,Dockerfile,docker-compose.yml,*.md,new_schema.sql,backend/schema.sql,backend/kwikar.sql,admin/backend/seed_admin.php"
