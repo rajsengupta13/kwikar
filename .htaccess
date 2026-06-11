@@ -32,6 +32,10 @@ RewriteRule ^contact-us/?$ frontend/legal/contact-us.html [L]
 #    from the frontend/ folder. Internal rewrite — URL does not change.
 RewriteRule ^(.*)$ frontend/$1 [L]
 
+# Video MIME types — required for browser playback and byte-range streaming
+AddType video/mp4 .mp4
+AddType video/webm .webm
+
 # Force UTF-8 for served HTML/CSS/JS
 AddDefaultCharset UTF-8
 

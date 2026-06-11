@@ -4,8 +4,10 @@ ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
 error_reporting(0);
 
+require_once __DIR__ . '/../../../backend/env.php';
+
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+send_cors_origin_header();
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
@@ -321,6 +323,27 @@ switch ($module) {
         $abds = $st->fetchAll();
 
         echo json_encode(['status' => 'success', 'abds' => $abds]);
+        break;
+
+    case 'recent_joins':
+        // Real-time feed of newly registered customers/technicians/ABDs for the Live Activity stream.
+        $since = trim((string)($_GET['since'] ?? ''));
+        $sql = "SELECT id, name, role, created_at FROM users WHERE role IN ('customer','technician','abd')";
+        $params = [];
+        if ($since !== '') {
+            $sql .= " AND created_at > ?";
+            $params[] = $since;
+        }
+        $sql .= " ORDER BY created_at DESC LIMIT 30";
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        $joins = $st->fetchAll();
+
+        echo json_encode([
+            'status'      => 'success',
+            'joins'       => $joins,
+            'server_time' => date('Y-m-d H:i:s'),
+        ]);
         break;
 
     case 'bookings':

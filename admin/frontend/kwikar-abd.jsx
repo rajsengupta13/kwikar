@@ -210,7 +210,7 @@ function ABDPage() {
             <div className="kcard">
               {abds.length===0 ? <Empty icon="briefcase" title="No ABDs registered yet"/> :
                 <table className="ktable">
-                  <thead><tr><th>ABD</th><th>Phone</th><th>Techs</th><th>Pincodes</th><th>Earned</th><th>Commission</th><th>Status</th><th></th></tr></thead>
+                  <thead><tr><th>ABD</th><th>Phone</th><th>Techs</th><th>Pincodes</th><th>Earned</th><th>Commission</th><th>Status</th><th>Joined</th><th></th></tr></thead>
                   <tbody>
                     {abds.map(abd=>(
                       <tr key={abd.abd_id||abd.id} onClick={()=>{ setSelected(abd); setDrawerOpen(true); }}>
@@ -226,6 +226,7 @@ function ABDPage() {
                         <td><span style={{ color:'var(--green)',fontWeight:600,fontFamily:'Space Grotesk' }}>{fCur(abd.total_earned||0)}</span></td>
                         <td><span style={{ color:'var(--amber)' }}>{abd.direct_commission_percent||12.5}%</span></td>
                         <td><Badge type={abd.status||abd.user_status} label={abd.status||abd.user_status}/></td>
+                        <td style={{ fontSize:12,color:'var(--text3)',whiteSpace:'nowrap' }}>{fDateTime(abd.created_at)}</td>
                         <td onClick={e=>e.stopPropagation()}>
                           <button className="kbtn" style={{ padding:'4px 8px' }} onClick={()=>{ setSelected(abd); setDrawerOpen(true); }}><Ico n="eye" s={12}/></button>
                         </td>

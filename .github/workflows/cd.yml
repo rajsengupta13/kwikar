@@ -1,0 +1,117 @@
+name: CD — Deploy to Hostinger (SSH)
+
+# Deploys to the live Hostinger site over SSH/rsync, but ONLY when
+# a pull request from `develop` into `production` is actually MERGED
+# (the `if:` guards below reject closed-but-not-merged PRs, PRs from
+# any other branch, and direct pushes). Re-lints the merged commit
+# as a final safety net before shipping.
+#
+# ── Secret group 1: SSH connection (Settings → Secrets → Actions) ──
+# Bundled into just TWO secrets instead of four:
+#   SSH_CONNECTION   — single line "user@host:port", e.g.
+#                        u123456789@123.45.67.89:65002
+#                      (user/host/port all come from hPanel → Advanced
+#                      → SSH Access; Hostinger's SSH port is commonly 65002)
+#   SSH_PRIVATE_KEY  — the private key whose matching public key is added
+#                      under hPanel → Advanced → SSH Access → SSH Keys
+#                      (kept separate — it's a multi-line PEM block and
+#                      shouldn't be mixed with delimited text)
+#
+# ── Secret group 2: production app environment ──────────────────────
+#   ENV_FILE_PRODUCTION — the FULL contents of the production `.env`
+#                         (copy .env.example, fill in real prod values:
+#                         DB credentials, ADMIN_SECRET, RAZORPAY_* keys,
+#                         MAIL_* settings, APP_ENV=production, etc.)
+#                         Paste the whole file as one secret's value.
+#
+# ── Optional repo variable ───────────────────────────────────────────
+#   SSH_TARGET_DIR — remote deploy path (defaults to ~/public_html/)
+on:
+  pull_request:
+    types: [closed]
+    branches: [production]
+  workflow_dispatch: {}
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Rsync over SSH to Hostinger
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       github.event.pull_request.base.ref == 'production' &&
+       github.event.pull_request.head.ref == 'develop')
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the exact commit that landed on `production`
+          # (the PR's merge commit), not a transient PR merge ref.
+          ref: ${{ github.event.pull_request.merge_commit_sha || 'production' }}
+
+      - name: Lint PHP on the exact commit being shipped (final safety net — full CI already ran on the PR)
+        run: |
+          set -e
+          while IFS= read -r -d '' file; do
+            php -l "$file"
+          done < <(find . -path ./vendor -prune -o -path ./node_modules -prune -o -name "*.php" -print0)
+
+      - name: Write production .env from secret
+        run: |
+          if [ -z "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
+            echo "::error::ENV_FILE_PRODUCTION secret is not set — see workflow header for setup"
+            exit 1
+          fi
+          printf '%s\n' "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+
+      - name: Parse SSH_CONNECTION ("user@host:port") into host/user/port
+        id: ssh
+        run: |
+          conn="${{ secrets.SSH_CONNECTION }}"
+          if [ -z "$conn" ]; then
+            echo "::error::SSH_CONNECTION secret is not set — expected format user@host:port (see workflow header)"
+            exit 1
+          fi
+          user="${conn%%@*}"
+          hostport="${conn#*@}"
+          host="${hostport%%:*}"
+          port="${hostport#*:}"
+          if [ -z "$user" ] || [ -z "$host" ] || [ -z "$port" ] || [ "$host" = "$port" ]; then
+            echo "::error::SSH_CONNECTION must be in the form user@host:port"
+            exit 1
+          fi
+          echo "user=$user"   >> "$GITHUB_OUTPUT"
+          echo "host=$host"   >> "$GITHUB_OUTPUT"
+          echo "port=$port"   >> "$GITHUB_OUTPUT"
+
+      - name: Deploy via rsync/SSH
+        uses: easingthemes/ssh-deploy@v5
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ steps.ssh.outputs.host }}
+          REMOTE_USER: ${{ steps.ssh.outputs.user }}
+          REMOTE_PORT: ${{ steps.ssh.outputs.port }}
+          SOURCE: "./"
+          TARGET: ${{ vars.SSH_TARGET_DIR || '~/public_html/' }}
+          ARGS: "-rlgoDzvc -i --delete"
+          EXCLUDE: |
+            .git/
+            .github/
+            .claude/
+            .vscode/
+            backend/logs/
+            backend/data/*.json
+            .env.example
+            .gitignore
+            .dockerignore
+            Dockerfile
+            docker-compose.yml
+            *.md
+            new_schema.sql
+            backend/schema.sql
+            backend/kwikar.sql
+            admin/backend/seed_admin.php

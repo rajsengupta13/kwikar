@@ -1,9 +1,11 @@
 <?php
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
+require_once __DIR__ . '/../../../backend/env.php';
+
 // Headers FIRST — ensures JSON is always returned even if a require fails
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+send_cors_origin_header();
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }

@@ -1,0 +1,69 @@
+# ═══════════════════════════════════════════════════════════════
+# Kwikar — .gitignore
+# ═══════════════════════════════════════════════════════════════
+
+# ── Environment & secrets ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+*.crt
+
+# ── PHP / Composer ───────────────────────────────────────────────
+/vendor/
+composer.phar
+composer.lock
+
+# ── Node / front-end tooling (if/when introduced) ────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+/dist/
+/build/
+
+# ── Logs & runtime data ──────────────────────────────────────────
+backend/logs/**
+!backend/logs/.gitkeep
+!backend/logs/.htaccess
+backend/data/*.json
+!backend/data/.gitkeep
+*.log
+
+# ── Database dumps & local seed artifacts ────────────────────────
+*.sql.bak
+*.sqlite
+*.sqlite3
+
+# ── Docker ───────────────────────────────────────────────────────
+docker-compose.override.yml
+.docker/
+mysql-data/
+
+# ── XAMPP / Apache local artifacts ───────────────────────────────
+*.log
+error_log
+access_log
+
+# ── OS artifacts ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor / IDE ─────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+
+# ── Claude Code local settings ───────────────────────────────────
+.claude/settings.local.json
+
+# ── Misc ─────────────────────────────────────────────────────────
+*.tmp
+*.bak
+*.orig

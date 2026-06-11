@@ -26,6 +26,10 @@ function fNum(v) {
   if (v >= 1000) return `${(v/1000).toFixed(1)}K`;
   return `${v}`;
 }
+function fDateTime(v) {
+  if (!v) return '—';
+  return new Date(String(v).replace(' ', 'T')).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
 function tAgo(s) {
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s/60)}m ago`;

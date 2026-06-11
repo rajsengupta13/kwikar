@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -r ' *)",
+      "Bash(grep -rniE \"C:\\\\\\\\\\\\\\\\xampp|/home/|/var/www\" --include=\"*.php\" --include=\"*.js\" --include=\"*.json\" -l .)",
+      "Bash(grep -rniE \"C:\\\\\\\\\\\\\\\\xampp\" -n . --include=\"*.php\" --include=\"*.js\" --include=\"*.json\" --include=\"*.html\" --include=\"*.htaccess\")"
+    ]
+  }
+}

@@ -89,7 +89,7 @@ function CustomersPage() {
                   <td><span style={{ fontFamily:'Space Grotesk',fontWeight:600,color:'var(--text)' }}>{c.actual_bookings||0}</span></td>
                   <td><span style={{ color:'var(--green)',fontWeight:500 }}>{fCur(c.total_spent||0)}</span></td>
                   <td><Badge type={c.status} label={c.status}/></td>
-                  <td style={{ fontSize:12,color:'var(--text3)' }}>{c.created_at ? new Date(c.created_at).toLocaleDateString('en-IN') : ''}</td>
+                  <td style={{ fontSize:12,color:'var(--text3)',whiteSpace:'nowrap' }}>{fDateTime(c.created_at)}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     <div style={{ display:'flex',gap:5 }}>
                       <button className="kbtn" style={{ padding:'4px 8px' }} onClick={()=>setSelected(c)}><Ico n="eye" s={12}/></button>
@@ -114,7 +114,7 @@ function CustomersPage() {
               <Badge type={selected.status} label={selected.status}/>
             </div>
             <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
-              {[{l:'Bookings',v:selected.actual_bookings||0},{l:'Total Spent',v:fCur(selected.total_spent||0)},{l:'Status',v:selected.status},{l:'Joined',v:selected.created_at?new Date(selected.created_at).toLocaleDateString('en-IN'):'-'}].map(m=>(
+              {[{l:'Bookings',v:selected.actual_bookings||0},{l:'Total Spent',v:fCur(selected.total_spent||0)},{l:'Status',v:selected.status},{l:'Joined',v:fDateTime(selected.created_at)}].map(m=>(
                 <div key={m.l} style={{ padding:'12px',background:'rgba(255,255,255,.03)',borderRadius:8 }}><div style={{ fontSize:11,color:'var(--text3)',marginBottom:4 }}>{m.l}</div><div style={{ fontSize:13,fontWeight:500,color:'var(--text)' }}>{m.v}</div></div>
               ))}
             </div>
@@ -334,7 +334,7 @@ function TechniciansPage() {
         {loading ? <div style={{ padding:40,textAlign:'center' }}><Spinner/></div> :
           filtered.length===0 ? <Empty icon="wrench" title="No technicians found"/> :
           <table className="ktable">
-            <thead><tr><th>Technician</th><th>Services</th><th>KYC</th><th>Status</th><th>Rating</th><th>Jobs</th><th>Wallet</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Technician</th><th>Services</th><th>KYC</th><th>Status</th><th>Rating</th><th>Jobs</th><th>Wallet</th><th>Joined</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map(t=>(
                 <tr key={t.technician_id||t.id} onClick={()=>{ setSelected(t); setDrawerOpen(true); }}>
@@ -350,6 +350,7 @@ function TechniciansPage() {
                   <td><span style={{ color:'var(--amber)' }}>{t.rating>0?t.rating+' ★':'—'}</span></td>
                   <td><span style={{ fontFamily:'Space Grotesk',fontWeight:600,color:'var(--text)' }}>{t.total_jobs||0}</span></td>
                   <td><span style={{ color:'var(--green)',fontWeight:500 }}>{fCur(t.wallet_balance||0)}</span></td>
+                  <td style={{ fontSize:12,color:'var(--text3)',whiteSpace:'nowrap' }}>{fDateTime(t.created_at)}</td>
                   <td onClick={e=>e.stopPropagation()}>
                     <div style={{ display:'flex',gap:5 }}>
                       <button className="kbtn" style={{ padding:'4px 8px' }} onClick={()=>{ setSelected(t); setDrawerOpen(true); }}><Ico n="eye" s={12}/></button>

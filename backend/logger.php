@@ -1,8 +1,20 @@
 <?php
+require_once __DIR__ . '/env.php';
+
+// Severity order — messages below the configured LOG_LEVEL are dropped.
+const KWIKAR_LOG_LEVELS = ['INFO' => 0, 'WARNING' => 1, 'ERROR' => 2, 'PHP_ERROR' => 2, 'EXCEPTION' => 2];
+
 function kwikar_log($level, $message, $context = []) {
+    $minLevel = strtoupper(env('LOG_LEVEL', 'info'));
+    $minRank  = KWIKAR_LOG_LEVELS[$minLevel] ?? 0;
+    $rank     = KWIKAR_LOG_LEVELS[strtoupper($level)] ?? 0;
+    if ($rank < $minRank) return;
+
     $date     = date('Y-m-d');
     $time     = date('H:i:s');
-    $dir      = __DIR__ . '/logs/' . $date;
+    $base     = env('LOG_PATH', 'logs');
+    $base     = ($base[0] ?? '') === '/' ? $base : __DIR__ . '/' . $base;
+    $dir      = $base . '/' . $date;
 
     if (!is_dir($dir)) {
         mkdir($dir, 0755, true);
