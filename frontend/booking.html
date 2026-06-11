@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Book Service — Kwikar</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0d1b3e;--blue:#1d4ed8;--light:#dce8ff;--bg:#f4f6fb;
+  --white:#fff;--sub:#64748b;--border:#e2e8f0;--green:#16a34a;--red:#ef4444;
+  --r:16px;--safe-top:env(safe-area-inset-top);--safe-bot:env(safe-area-inset-bottom);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--navy);min-height:100vh;-webkit-tap-highlight-color:transparent}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+
+/* ── HEADER ── */
+.bk-header{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:linear-gradient(135deg,#dce8ff,#ecf2ff);
+  padding:calc(10px + var(--safe-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(13,27,62,.1);
+}
+.bk-back{background:none;border:none;font-size:1.4rem;color:var(--navy);padding:4px 8px;border-radius:8px}
+.bk-back:active{background:rgba(13,27,62,.08)}
+.bk-title{font-size:.9rem;font-weight:700;color:var(--navy)}
+.bk-progress{display:flex;align-items:center;gap:6px}
+.bk-dot{width:24px;height:4px;border-radius:4px;background:rgba(13,27,62,.2);transition:all .3s}
+.bk-dot.active{background:var(--blue);width:32px}
+.bk-dot.done{background:var(--navy)}
+
+/* ── PAGE WRAPPER ── */
+.bk-page{
+  padding-top:calc(70px + var(--safe-top));
+  padding-bottom:calc(100px + var(--safe-bot));
+  min-height:100vh;
+}
+
+/* ── STEP ── */
+.step{display:none;padding:20px 16px 0;animation:fadeUp .35s ease both}
+.step.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+/* ── APPLIANCE IMAGE ── */
+.app-img-wrap{
+  width:100%;background:var(--white);border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;
+  height:180px;overflow:hidden;margin-bottom:20px;
+  box-shadow:0 4px 16px rgba(13,27,62,.08);
+}
+.app-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+.app-emoji{font-size:4rem}
+.step-heading{font-size:1.3rem;font-weight:800;color:var(--navy);margin-bottom:4px}
+.step-sub{font-size:.85rem;color:var(--sub);margin-bottom:20px}
+
+/* ── ISSUE CHIPS ── */
+.issues-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.issue-chip{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:12px;padding:12px 10px;font-size:.82rem;font-weight:600;
+  color:var(--navy);text-align:center;transition:all .2s;
+}
+.issue-chip.selected{background:var(--navy);border-color:var(--navy);color:var(--white)}
+.issue-chip:active{transform:scale(.97)}
+
+/* ── OTHER TEXTAREA ── */
+.other-box{
+  display:none;margin-bottom:14px;
+  background:var(--white);border-radius:var(--r);
+  border:1.5px solid var(--border);overflow:hidden;
+}
+.other-box.show{display:block}
+.other-box textarea{
+  width:100%;border:none;outline:none;padding:14px;
+  font-family:inherit;font-size:.88rem;color:var(--navy);
+  background:transparent;resize:none;min-height:90px;
+}
+.other-box textarea::placeholder{color:#94a3b8}
+
+/* ── FIXED BOTTOM BUTTON ── */
+.bk-footer{
+  position:fixed;bottom:0;left:0;right:0;
+  padding:12px 16px calc(12px + var(--safe-bot));
+  background:linear-gradient(to top,var(--bg) 80%,transparent);
+  z-index:99;
+}
+.bk-btn{
+  width:100%;height:52px;background:linear-gradient(135deg,var(--navy),var(--blue));
+  color:var(--white);border:none;border-radius:14px;
+  font-size:1rem;font-weight:800;
+  box-shadow:0 6px 20px rgba(29,78,216,.35);
+  transition:all .2s;
+}
+.bk-btn:active{transform:scale(.98)}
+.bk-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── SCHEDULE STEP ── */
+.days-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;scrollbar-width:none}
+.days-scroll::-webkit-scrollbar{display:none}
+.day-chip{
+  flex-shrink:0;min-width:64px;padding:10px 8px;border-radius:12px;
+  background:var(--white);border:1.5px solid var(--border);
+  text-align:center;cursor:pointer;transition:all .2s;
+}
+.day-chip .day-name{font-size:.7rem;font-weight:600;color:var(--sub)}
+.day-chip .day-date{font-size:.85rem;font-weight:800;color:var(--navy)}
+.day-chip.selected{background:var(--navy);border-color:var(--navy)}
+.day-chip.selected .day-name,.day-chip.selected .day-date{color:var(--white)}
+
+.slots-list{display:flex;flex-direction:column;gap:10px}
+.slot-item{
+  background:var(--white);border:1.5px solid var(--border);
+  border-radius:12px;padding:14px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;transition:all .2s;
+}
+.slot-item.selected{border-color:var(--blue);background:#eff6ff}
+.slot-item.disabled{opacity:.4;cursor:not-allowed;background:#f8fafc}
+.slot-time{font-size:1rem;font-weight:700;color:var(--navy)}
+.slot-avail{font-size:.75rem;font-weight:600;color:var(--green)}
+.slot-avail.na{color:#94a3b8}
+.slot-radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;transition:all .2s;display:flex;align-items:center;justify-content:center}
+.slot-item.selected .slot-radio{border-color:var(--blue);background:var(--blue)}
+.slot-item.selected .slot-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
+
+/* ── NOTIFY BANNER ── */
+.notify-banner{
+  display:flex;align-items:center;gap:12px;
+  background:linear-gradient(135deg,#0d1b3e,#1d4ed8);
+  border-radius:14px;padding:14px 16px;
+  box-shadow:0 6px 20px rgba(29,78,216,.35);
+}
+.notify-icon{font-size:1.5rem;flex-shrink:0}
+.notify-title{font-size:.95rem;font-weight:800;color:#fff;margin-bottom:2px}
+.notify-sub{font-size:.75rem;color:rgba(255,255,255,.75);line-height:1.4}
+
+/* ── BOOKING LOGIN MODAL ── */
+.bk-login-overlay{
+  position:fixed;inset:0;z-index:400;
+  background:rgba(13,27,62,.65);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.bk-login-overlay.show{display:flex;animation:fadeIn .25s ease}
+.bk-login-sheet{
+  background:var(--white);border-radius:24px 24px 0 0;
+  padding:28px 20px calc(28px + var(--safe-bot));
+  width:100%;max-width:480px;
+  animation:slideUp .35s cubic-bezier(.2,1,.4,1) both;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.bk-login-badge{
+  display:inline-block;background:#fff3e0;color:#b45309;
+  font-size:.72rem;font-weight:700;border-radius:20px;
+  padding:4px 12px;margin-bottom:14px;
+}
+.bk-login-sheet h3{font-size:1.15rem;font-weight:800;color:var(--navy);margin-bottom:4px}
+.bk-login-sheet p{font-size:.82rem;color:var(--sub);margin-bottom:20px;line-height:1.5}
+.bk-login-input{
+  width:100%;height:50px;border:1.5px solid var(--border);border-radius:12px;
+  padding:0 14px;font-size:.95rem;color:var(--navy);background:var(--bg);
+  outline:none;transition:border .2s;margin-bottom:10px;font-family:inherit;
+}
+.bk-login-input:focus{border-color:var(--blue);background:var(--white);box-shadow:0 0 0 3px rgba(29,78,216,.1)}
+.bk-login-err{font-size:.78rem;color:var(--red);min-height:18px;margin-bottom:8px}
+.bk-login-btn{
+  width:100%;height:50px;background:linear-gradient(135deg,var(--navy),var(--blue));
+  color:var(--white);border:none;border-radius:12px;
+  font-size:1rem;font-weight:800;transition:all .2s;font-family:inherit;
+}
+.bk-login-btn:active{transform:scale(.98)}
+.bk-login-btn:disabled{opacity:.5;cursor:not-allowed}
+.bk-login-register{text-align:center;margin-top:14px;font-size:.8rem;color:var(--sub)}
+.bk-login-register a{color:var(--blue);font-weight:700;text-decoration:none}
+
+/* ── SLOT SKELETON ── */
+.slot-skeleton{cursor:default!important;pointer-events:none}
+.skel-line{border-radius:6px;background:linear-gradient(90deg,#e2e8f0 25%,#f1f5f9 50%,#e2e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ── ADDRESS STEP ── */
+.addr-form{display:flex;flex-direction:column;gap:14px}
+.addr-field{display:flex;flex-direction:column;gap:5px}
+.addr-field label{font-size:.78rem;font-weight:700;color:var(--navy)}
+.addr-field input,.addr-field textarea{
+  border:1.5px solid var(--border);border-radius:12px;
+  padding:12px 14px;font-size:.9rem;color:var(--navy);
+  background:var(--white);outline:none;transition:border .2s;
+}
+.addr-field textarea{resize:none;min-height:80px}
+.addr-field input:focus,.addr-field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(29,78,216,.1)}
+
+/* ── OVERLAY POPUP ── */
+.overlay{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(13,27,62,.6);
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+.overlay.show{display:flex;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* ── UNDERSTAND POPUP ── */
+.understand-box{
+  background:var(--white);border-radius:20px;
+  padding:24px 20px;text-align:center;
+  max-width:260px;width:100%;
+  animation:popIn .35s cubic-bezier(.2,1.5,.4,1) both;
+}
+@keyframes popIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+.understand-box .emoji{margin-bottom:12px;display:flex;justify-content:center}
+.understand-box h3{font-size:1.2rem;font-weight:800;color:var(--navy)}
+
+/* ── INFO POPUP (user info + profession) ── */
+.info-box{
+  background:var(--white);border-radius:24px;
+  padding:28px 20px;max-width:420px;width:100%;
+  animation:popIn .35s cubic-bezier(.2,1.5,.4,1) both;
+}
+.info-box h3{font-size:1.1rem;font-weight:800;color:var(--navy);margin-bottom:4px}
+.info-box p{font-size:.8rem;color:var(--sub);margin-bottom:18px;line-height:1.5}
+.info-input{
+  width:100%;height:48px;border:1.5px solid var(--border);border-radius:12px;
+  padding:0 14px;font-size:.9rem;color:var(--navy);background:var(--bg);
+  outline:none;transition:border .2s;margin-bottom:10px;
+}
+.info-input:focus{border-color:var(--blue);background:var(--white)}
+.info-btn{
+  width:100%;height:48px;background:linear-gradient(135deg,var(--navy),var(--blue));
+  color:var(--white);border:none;border-radius:12px;
+  font-size:.95rem;font-weight:800;margin-top:6px;
+  transition:all .2s;
+}
+
+/* ── SUCCESS / FAIL POPUP ── */
+.result-box{
+  background:var(--white);border-radius:24px;
+  padding:32px 20px;text-align:center;max-width:360px;width:100%;
+  animation:popIn .35s cubic-bezier(.2,1.5,.4,1) both;
+}
+.result-box .r-emoji{font-size:3rem;margin-bottom:10px}
+#failOverlay .result-box{padding:0 20px 22px;max-width:340px}
+#failOverlay .result-box .r-emoji{
+  margin:10px -20px -10px;
+  height:95px;
+  border-radius:24px 24px 0 0;
+  overflow:hidden;
+  display:flex;align-items:flex-start;justify-content:center;
+  position:relative;z-index:1;
+}
+#failOverlay .result-box .r-emoji img{
+  width:auto;height:100%;
+  object-fit:contain;
+  object-position:center top;
+}
+#failOverlay .result-box h3{position:relative;z-index:2;font-size:.95rem;margin-top:8px;margin-bottom:4px}
+.result-box h3{font-size:1.2rem;font-weight:800;color:var(--navy);margin-bottom:8px}
+.result-box p{font-size:.85rem;color:var(--sub);line-height:1.4;margin-bottom:8px}
+.result-box .r-sub{font-size:.82rem;font-weight:700;color:var(--navy);margin-bottom:8px}
+.r-btns{display:flex;gap:10px}
+.r-btn{flex:1;height:44px;border:none;border-radius:12px;font-size:.88rem;font-weight:700;transition:all .2s}
+.r-btn.yes{background:var(--navy);color:#fff}
+.r-btn.no{background:var(--bg);color:var(--navy);border:1.5px solid var(--border)}
+.r-close{
+  margin-top:14px;width:100%;height:44px;
+  background:var(--navy);color:#fff;border:none;
+  border-radius:12px;font-size:.9rem;font-weight:700;
+}
+
+@media(max-width:400px){
+  .app-img-wrap{height:180px}
+  .svc-name-title{font-size:1.05rem}
+  .step-heading{font-size:1rem}
+  .bk-btn{height:46px;font-size:.9rem}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="bk-header">
+  <button class="bk-back" onclick="goBack()">&#8592;</button>
+  <div class="bk-progress">
+    <div class="bk-dot active" id="dot1"></div>
+    <div class="bk-dot" id="dot2"></div>
+    <div class="bk-dot" id="dot3"></div>
+  </div>
+  <div class="bk-title" id="stepLabel">Step 1 of 3</div>
+</header>
+
+<div class="bk-page">
+
+  <!-- STEP 1: ISSUE SELECTION -->
+  <div class="step active" id="step1">
+    <div class="app-img-wrap" id="appImgWrap"></div>
+    <h2 class="step-heading" id="serviceHeading">Kya problem hai?</h2>
+    <p class="step-sub">Jo problem aa rahi hai wo select karo</p>
+    <div class="issues-grid" id="issuesGrid"></div>
+    <div class="other-box" id="otherBox">
+      <textarea id="otherText" placeholder="Apni problem thodi detail mein batao..."></textarea>
+    </div>
+  </div>
+
+  <!-- STEP 2: SCHEDULE -->
+  <div class="step" id="step2">
+    <h2 class="step-heading">Time Slot Select karo</h2>
+    <p class="step-sub">Apni suvidha ke anusaar time aur din select karo</p>
+    <div class="days-scroll" id="daysScroll"></div>
+    <div class="slots-list" id="slotsList"></div>
+  </div>
+
+  <!-- STEP 3: ADDRESS -->
+  <div class="step" id="step3">
+    <h2 class="step-heading">Aapka Address</h2>
+    <p class="step-sub">Technician ko kahaan aana hai?</p>
+    <div class="addr-form">
+      <div class="addr-field">
+        <label>Poora Address *</label>
+        <textarea id="fullAddress" placeholder="Ghar no., gali, mohalla, shehar..."></textarea>
+      </div>
+      <div class="addr-field">
+        <label>Pincode *</label>
+        <input type="tel" id="pincode" maxlength="6" inputmode="numeric" placeholder="6-digit pincode">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FIXED BOTTOM BUTTON -->
+<div class="bk-footer">
+  <button class="bk-btn" id="mainBtn" onclick="handleContinue()">Continue →</button>
+  <div id="notifyBanner" style="display:none">
+    <div class="notify-banner">
+      <span class="notify-icon">🔔</span>
+      <div>
+        <div class="notify-title">You will be notified soon</div>
+        <div class="notify-sub">Jaise hi technician available hoga, aapko notify kar denge</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- POPUP: UNDERSTAND (2 sec) -->
+<div class="overlay" id="understandOverlay">
+  <div class="understand-box">
+    <div class"emoji">
+      <img src="images/tech-thumbsup.png" alt="Technician" style="width:100px;height:100px;object-fit:contain">
+    </div>
+    <h3>Main aap ki problem ko samajh gaya!</h3>
+  </div>
+</div>
+
+<!-- POPUP: USER INFO -->
+<div class="overlay" id="userInfoOverlay">
+  <div class="info-box">
+    <h3>Aapka Introduction</h3>
+    <p>Aapki booking ke liye thodi basic jaankari chahiye</p>
+    <input class="info-input" type="text" id="userName" placeholder="Your Name*">
+    <input class="info-input" type="tel" id="userPhone" maxlength="10" inputmode="numeric" placeholder="Mobile Number *">
+    <button class="info-btn" onclick="submitUserInfo()">Continue →</button>
+  </div>
+</div>
+
+<!-- POPUP: PROFESSION -->
+<div class="overlay" id="professionOverlay">
+  <div class="info-box">
+    <h3>Aapka Profession</h3>
+    <p>Apna profession batao, taki hum aapke liye sahi technician bhej sakein</p>
+    <input class="info-input" type="text" id="userProfession" placeholder="Jaise: Teacher, Doctor, Business...">
+    <button class="info-btn" onclick="submitProfession()">Continue →</button>
+  </div>
+</div>
+
+<!-- POPUP: BOOKING SUCCESS -->
+<div class="overlay" id="successOverlay">
+  <div class="result-box">
+    <div class="r-emoji">✅</div>
+    <h3>Booking Ho Gayi!</h3>
+    <p>Hamara verified technician <strong>60 minute</strong> mein aapke darwaze par aa jayega. Aapke phone par confirmation SMS bheja jayega.</p>
+    <button class="r-close" onclick="window.location.href='index.html'">Back to Home Page</button>
+  </div>
+</div>
+
+<!-- POPUP: SERVICE NOT AVAILABLE -->
+<div class="overlay" id="failOverlay">
+  <div class="result-box">
+    <div class="r-emoji"><img src="images/tech-sad.png" alt=""></div>
+    <h3>Sorry!</h3>
+    <p>Abhi aapke area mein service available nahi hai!</p>
+    <div class="r-sub">Kya aap apne area mein hamari service chahte hain?</div>
+    <div class="r-btns">
+      <button class="r-btn yes" onclick="saveFeedback(1)">Yes!</button>
+      <button class="r-btn no" onclick="saveFeedback(0)">No</button>
+    </div>
+  </div>
+</div>
+
+<!-- POPUP: REVIEW YES — Thank you -->
+<div class="overlay" id="reviewYesOverlay">
+  <div class="result-box">
+    <div class="r-emoji">🙏</div>
+    <h3>Shukriya!</h3>
+    <p>Aapka review humein bahut help karta hai. Hum jald hi aapke area mein service launch karenge!</p>
+    <button class="r-close" onclick="window.location.href='index.html'">Go Back to Homepage →</button>
+  </div>
+</div>
+
+<!-- BOOKING LOGIN / REGISTER MODAL -->
+<div class="bk-login-overlay" id="bkLoginOverlay">
+  <div class="bk-login-sheet">
+    <div class="bk-login-badge">Booking ke liye zaroori</div>
+
+    <!-- ── LOGIN VIEW ── -->
+    <div id="bkLoginView">
+      <h3>Login Karo</h3>
+      <p>Time slot book karne ke liye pehle login karo</p>
+      <input class="bk-login-input" type="tel" id="bkLoginPhone" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number">
+      <input class="bk-login-input" type="tel" id="bkLoginPin" maxlength="4" inputmode="numeric" placeholder="4-digit PIN">
+      <div class="bk-login-err" id="bkLoginErr"></div>
+      <button class="bk-login-btn" id="bkLoginBtn" onclick="bkLoginSubmit()">Login Karo →</button>
+      <div class="bk-login-register">Naya account? <a href="javascript:void(0)" onclick="bkShowRegister()">Register karo</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 1: Name + Phone ── -->
+    <div id="bkRegStep1" style="display:none">
+      <h3>Register Karo</h3>
+      <p>Apna account banao aur booking karo</p>
+      <input class="bk-login-input" type="text"  id="bkRegName"  placeholder="Aapka naam *">
+      <input class="bk-login-input" type="tel"   id="bkRegPhone" maxlength="10" inputmode="numeric" placeholder="10-digit mobile number *">
+      <input class="bk-login-input" type="email" id="bkRegEmail" placeholder="Email (optional)">
+      <div class="bk-login-err" id="bkRegErr1"></div>
+      <button class="bk-login-btn" onclick="bkRegNext1()">Continue →</button>
+      <div class="bk-login-register">Pehle se account hai? <a href="javascript:void(0)" onclick="bkShowLogin()">Login karo</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 2: Address ── -->
+    <div id="bkRegStep2" style="display:none">
+      <h3>Aapka Address</h3>
+      <p>Technician ko kahaan aana hai?</p>
+      <input class="bk-login-input" type="text" id="bkRegAddress" placeholder="Poora address (ghar no., gali, mohalla) *">
+      <input class="bk-login-input" type="text" id="bkRegCity"    placeholder="Shehar / area *">
+      <input class="bk-login-input" type="tel"  id="bkRegPincode" maxlength="6" inputmode="numeric" placeholder="6-digit pincode *">
+      <div class="bk-login-err" id="bkRegErr2"></div>
+      <button class="bk-login-btn" onclick="bkRegNext2()">Continue →</button>
+      <div class="bk-login-register"><a href="javascript:void(0)" onclick="bkRegBack1()">← Wapas jao</a></div>
+    </div>
+
+    <!-- ── REGISTER STEP 3: PIN ── -->
+    <div id="bkRegStep3" style="display:none">
+      <h3>PIN Set Karo</h3>
+      <p>Yeh 4-digit PIN login ke liye use hoga</p>
+      <input class="bk-login-input" type="tel" id="bkRegPin"        maxlength="4" inputmode="numeric" placeholder="4-digit PIN banao *">
+      <input class="bk-login-input" type="tel" id="bkRegPinConfirm" maxlength="4" inputmode="numeric" placeholder="PIN dobara daalo *">
+      <div class="bk-login-err" id="bkRegErr3"></div>
+      <button class="bk-login-btn" id="bkRegBtn" onclick="bkRegSubmit()">Register &amp; Book Karo →</button>
+      <div class="bk-login-register"><a href="javascript:void(0)" onclick="bkRegBack2()">← Wapas jao</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- POPUP: REVIEW NO — Sorry -->
+<div class="overlay" id="reviewNoOverlay">
+  <div class="result-box">
+    <div class="r-emoji">💙</div>
+    <h3>Koi baat nahi!</h3>
+    <p>Humein maafi chahiye ki hum aapko disappoint kar rahe hain. Hum apni service ko aur behtar banane ki koshish karenge!</p>
+    <button class="r-close" onclick="window.location.href='index.html'">Go Back to Homepage →</button>
+  </div>
+</div>
+
+<script>
+const _BASE = window.location.pathname
+  .replace(/\/frontend\/.*$/, '')
+  .replace(/\/[^/]*\.html$/, '')
+  .replace(/\/$/, '');
+const API = _BASE + '/backend/booking_api.php';
+
+const SERVICES = {
+  ac:       { name:'AC Service',             img:'images/ac-repair.png' },
+  fridge:   { name:'Refrigerator Service',   img:'images/fridge-repair.png' },
+  washing:  { name:'Washing Machine Service',img:'images/wm-repair.png' },
+  tv:       { name:'TV Repair',              img:'images/tv-repair.png' },
+  ro:       { name:'RO Purifier Service',    img:'images/ro-repair.png' },
+  geyser:   { name:'Geyser Repair',          img:'images/geyser-repair.png' },
+  microwave:{ name:'Microwave Repair',       img:'images/microwave-repair.png' },
+  other:    { name:'Other Service',          img:null }
+};
+
+const ISSUES = {
+  ac:       ['Cooling Nahi Ho Raha','Gas Refill Chahiye','Deep Cleaning','Awaz Aa Rahi Hai','Paani Tapak Raha Hai','Start Nahi Ho Raha','Remote Kaam Nahi Kar Raha','Other'],
+  fridge:   ['Thanda Nahi Kar Raha','Paani Tapak Raha Hai','Awaz Aa Rahi Hai','Compressor Issue','Baraf Nahi Ban Raha','Door Seal Kharab','Other'],
+  washing:  ['Spin Nahi Kar Raha','Paani Nahi Nikal Raha','Paani Tapak Raha Hai','Start Nahi Ho Raha','Drum Issue','Error Code Aa Raha Hai','Other'],
+  tv:       ['Screen Nahi Aa Rahi','Awaaz Nahi Aa Rahi','Screen Damage Hai','On Nahi Ho Raha','Remote Issue','HDMI Kaam Nahi Kar Raha','Other'],
+  ro:       ['Paani Kam Aa Raha Hai','Taste Kharab Hai','Paani Tapak Raha Hai','Filter Change Chahiye','TDS Zyada Hai','Motor Issue','Other'],
+  geyser:   ['Garam Paani Nahi Aa Raha','Paani Tapak Raha Hai','Bahut Dheere Garam Hota Hai','Start Nahi Ho Raha','Temperature Issue','Awaz Aa Rahi Hai','Other'],
+  microwave:['Garam Nahi Kar Raha','Andar Spark Aa Raha Hai','Door Issue','Turntable Nahi Ghoom Raha','Display Issue','Awaz Aa Rahi Hai','Other'],
+  other:    ['Other']
+};
+
+const SERVICEABLE = ['812001','812002','812003','812004','812005','812006','812007','813102','813201','813202','813203','813204','813205','813206','813207','813210','813211','813212','813213'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const TIME_SLOTS = [
+  { label:'10:00 AM – 12:00 PM', start:10 },
+  { label:'12:00 PM – 02:00 PM', start:12 },
+  { label:'02:00 PM – 04:00 PM', start:14 },
+  { label:'04:00 PM – 06:00 PM', start:16 },
+  { label:'06:00 PM – 08:00 PM', start:18 }
+];
+
+// State
+let currentStep = 1;
+let service = '';
+let selectedIssue = '';
+let selectedSlot = '';
+let selectedDay = '';
+let userName = '';
+let userPhone = '';
+let userProfession = '';
+let availabilityMap = {};  // { 'slot label' => { available, count, total } }
+
+// Pre-fill from localStorage if user is logged in
+(function(){
+  const u = localStorage.getItem('kwikar_user');
+  if(!u) return;
+  try {
+    const data = JSON.parse(u);
+    userName  = data.name    || '';
+    userPhone = data.phone   || '';
+    // Pre-fill address step
+    if(data.address) document.getElementById('fullAddress').value = data.address;
+    if(data.pincode) document.getElementById('pincode').value     = data.pincode;
+    // Pre-fill user info popup
+    if(data.name)  document.getElementById('userName').value  = data.name;
+    if(data.phone) document.getElementById('userPhone').value = data.phone;
+  } catch(e) {}
+})();
+
+// Init
+function init() {
+  const params = new URLSearchParams(location.search);
+  service = params.get('service') || 'other';
+  if (!SERVICES[service]) service = 'other';
+
+  const svc = SERVICES[service];
+  document.getElementById('serviceHeading').textContent = 'Kya problem hai?';
+  document.title = svc.name + ' — Kwikar';
+
+  document.getElementById('serviceHeading').textContent = svc.name + ' — Kya problem hai?';
+
+  const imgWrap = document.getElementById('appImgWrap');
+  if (svc.img) {
+    imgWrap.innerHTML = `<img src="${svc.img}" alt="${svc.name}">`;
+  } else {
+    imgWrap.innerHTML = `<div class="app-emoji">🔧</div>`;
+  }
+
+  buildIssues();
+}
+
+function buildIssues() {
+  const grid = document.getElementById('issuesGrid');
+  const issues = ISSUES[service] || ['Other'];
+  grid.innerHTML = '';
+  issues.forEach(issue => {
+    const btn = document.createElement('button');
+    btn.className = 'issue-chip';
+    btn.textContent = issue;
+    btn.onclick = () => selectIssue(issue, btn);
+    grid.appendChild(btn);
+  });
+  if (service === 'other') {
+    document.getElementById('otherBox').classList.add('show');
+    selectedIssue = 'Other';
+  }
+}
+
+function selectIssue(issue, btn) {
+  document.querySelectorAll('.issue-chip').forEach(c => c.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedIssue = issue;
+  if (issue === 'Other') {
+    document.getElementById('otherBox').classList.add('show');
+    document.getElementById('otherText').focus();
+  } else {
+    document.getElementById('otherBox').classList.remove('show');
+  }
+}
+
+function buildSlotsLoading() {
+  const list = document.getElementById('slotsList');
+  list.innerHTML = TIME_SLOTS.map(() => `
+    <div class="slot-item slot-skeleton">
+      <div>
+        <div class="skel-line" style="width:140px;height:16px;margin-bottom:6px"></div>
+        <div class="skel-line" style="width:90px;height:12px"></div>
+      </div>
+      <div class="slot-radio"></div>
+    </div>`).join('');
+  document.getElementById('mainBtn').disabled = true;
+}
+
+function getUserPincode() {
+  try {
+    const u = JSON.parse(localStorage.getItem('kwikar_user') || '{}');
+    return (u.pincode || '').trim();
+  } catch(e) { return ''; }
+}
+
+async function fetchSlotAvailability(dateStr) {
+  availabilityMap = {};
+  const pincode = getUserPincode();
+  if (!pincode || !/^\d{6}$/.test(pincode)) return;
+  // dateStr like "23 May 2026" — PHP strtotime handles this fine
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'slot_availability', pincode, date: dateStr })
+    });
+    const json = await res.json();
+    if (json.success && Array.isArray(json.slots)) {
+      json.slots.forEach(s => { availabilityMap[s.label] = s; });
+    }
+  } catch(e) {}
+}
+
+function buildSchedule() {
+  const daysContainer = document.getElementById('daysScroll');
+  const now = new Date();
+  daysContainer.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(now.getDate() + i);
+    const chip = document.createElement('div');
+    chip.className = 'day-chip' + (i === 0 ? ' selected' : '');
+    chip.innerHTML = `<div class="day-name">${i === 0 ? 'Aaj' : DAYS_SHORT[d.getDay()]}</div><div class="day-date">${d.getDate()} ${MONTHS[d.getMonth()]}</div>`;
+    const dateStr = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+    chip.onclick = (function(ds) { return () => {
+      document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+      selectedDay = ds;
+      buildSlots();
+    }; })(dateStr);
+    if (i === 0) selectedDay = dateStr;
+    daysContainer.appendChild(chip);
+  }
+  buildSlots();
+}
+
+function buildSlots() {
+  const list = document.getElementById('slotsList');
+  list.innerHTML = '';
+  selectedSlot = '';
+  document.getElementById('mainBtn').disabled = true;
+
+  // All slots are closed — high demand mode
+  TIME_SLOTS.forEach(slot => {
+    const item = document.createElement('div');
+    item.className = 'slot-item disabled';
+    item.innerHTML = `
+      <div>
+        <div class="slot-time">${slot.label}</div>
+        <div class="slot-avail na">Due to high demand all technician are busy now</div>
+      </div>
+      <div class="slot-radio"></div>`;
+    list.appendChild(item);
+  });
+}
+
+function updateHeader() {
+  const dots = document.querySelectorAll('.bk-dot');
+  dots.forEach((d,i) => {
+    d.classList.remove('active','done');
+    if (i+1 === currentStep) d.classList.add('active');
+    else if (i+1 < currentStep) d.classList.add('done');
+  });
+  document.getElementById('stepLabel').textContent = `Step ${currentStep} of 3`;
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active');
+  currentStep = n;
+  updateHeader();
+  window.scrollTo(0,0);
+  const btn    = document.getElementById('mainBtn');
+  const notify = document.getElementById('notifyBanner');
+  if (n === 2) {
+    btn.style.display    = 'none';
+    notify.style.display = '';
+  } else {
+    btn.style.display    = '';
+    notify.style.display = 'none';
+    if (n===1) { btn.textContent='Aage Bado →'; btn.disabled=false; }
+    else if (n===3) { btn.textContent='Book Karo 🚀'; btn.disabled=false; }
+  }
+}
+
+function goBack() {
+  if (currentStep > 1) { showStep(currentStep-1); }
+  else { window.location.href='index.html'; }
+}
+
+function handleContinue() {
+  if (currentStep === 1) {
+    if (!selectedIssue) { alert('Pehle ek problem select karo'); return; }
+    if (selectedIssue === 'Other' && !document.getElementById('otherText').value.trim()) {
+      alert('Apni problem thodi detail mein batao'); return;
+    }
+    // Gate: must be logged in before seeing time slots
+    if (!localStorage.getItem('kwikar_user')) {
+      openBkLoginModal();
+      return;
+    }
+    showUnderstandPopup();
+  } else if (currentStep === 2) {
+    if (!selectedSlot) { alert('Ek time slot select karo'); return; }
+    if (!selectedDay) { alert('Ek din select karo'); return; }
+    // Skip user info popup if already logged in
+    const savedUser = localStorage.getItem('kwikar_user');
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        userName  = u.name  || '';
+        userPhone = u.phone || '';
+      } catch(e) {}
+      showOverlay('professionOverlay');
+    } else {
+      showOverlay('userInfoOverlay');
+    }
+  } else if (currentStep === 3) {
+    submitBooking();
+  }
+}
+
+function showUnderstandPopup() {
+  showOverlay('understandOverlay');
+  buildSchedule();
+  setTimeout(() => {
+    hideOverlay('understandOverlay');
+    showStep(2);
+  }, 2000);
+}
+
+function submitUserInfo() {
+  const name = document.getElementById('userName').value.trim();
+  const phone = document.getElementById('userPhone').value.trim();
+  if (!name) { alert('Naam daalo'); return; }
+  if (!/^\d{10}$/.test(phone)) { alert('Sahi 10-digit mobile number daalo'); return; }
+  userName = name;
+  userPhone = phone;
+  hideOverlay('userInfoOverlay');
+  showOverlay('professionOverlay');
+}
+
+function submitProfession() {
+  userProfession = document.getElementById('userProfession').value.trim() || 'Not specified';
+  hideOverlay('professionOverlay');
+  showStep(3);
+}
+
+async function submitBooking() {
+  const address = document.getElementById('fullAddress').value.trim();
+  const pincode = document.getElementById('pincode').value.trim();
+  if (!address) { alert('Poora address daalo'); return; }
+  if (!/^\d{6}$/.test(pincode)) { alert('Sahi 6-digit pincode daalo'); return; }
+
+  const btn = document.getElementById('mainBtn');
+  btn.disabled = true;
+  btn.textContent = 'Booking Ho Rahi Hai...';
+
+  const available = SERVICEABLE.includes(pincode);
+  const payload = {
+    action:'book', service, issue:selectedIssue,
+    other_issue: selectedIssue==='Other' ? document.getElementById('otherText').value.trim() : '',
+    slot_time:selectedSlot, slot_date:selectedDay,
+    user_name:userName, user_phone:userPhone,
+    profession:userProfession, full_address:address,
+    pincode, pincode_available: available ? 1 : 0
+  };
+
+  try {
+    const res = await fetch(API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!json.success) {
+      alert('Error: ' + (json.error || 'Kuch galat ho gaya, dobara try karo'));
+      btn.disabled = false;
+      btn.textContent = 'Book Karo 🚀';
+      return;
+    }
+  } catch(e) {
+    alert('Server se connect nahi ho paya. Check karo ki XAMPP chal raha hai: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Book Karo 🚀';
+    return;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Book Karo 🚀';
+
+  if (available) { showOverlay('successOverlay'); }
+  else { showOverlay('failOverlay'); }
+}
+
+async function saveFeedback(wants) {
+  const pincode = document.getElementById('pincode').value.trim();
+  try {
+    await fetch(API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'save_feedback', pincode, user_name:userName, user_phone:userPhone, profession:userProfession, wants_service:wants })
+    });
+  } catch(e) {}
+  hideOverlay('failOverlay');
+  if(wants === 1) {
+    showOverlay('reviewYesOverlay');
+  } else {
+    showOverlay('reviewNoOverlay');
+  }
+}
+
+function showOverlay(id) { document.getElementById(id).classList.add('show'); }
+function hideOverlay(id) { document.getElementById(id).classList.remove('show'); }
+
+/* ── BOOKING LOGIN / REGISTER MODAL ── */
+function _bkShow(id) {
+  ['bkLoginView','bkRegStep1','bkRegStep2','bkRegStep3'].forEach(v =>
+    document.getElementById(v).style.display = v === id ? '' : 'none'
+  );
+}
+
+function openBkLoginModal() {
+  document.getElementById('bkLoginPhone').value = '';
+  document.getElementById('bkLoginPin').value   = '';
+  document.getElementById('bkLoginErr').textContent = '';
+  _bkShow('bkLoginView');
+  document.getElementById('bkLoginOverlay').classList.add('show');
+  setTimeout(() => document.getElementById('bkLoginPhone').focus(), 300);
+}
+
+function closeBkLoginModal() {
+  document.getElementById('bkLoginOverlay').classList.remove('show');
+}
+
+function bkShowRegister() {
+  ['bkRegName','bkRegPhone','bkRegEmail','bkRegAddress','bkRegCity','bkRegPincode','bkRegPin','bkRegPinConfirm']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  ['bkRegErr1','bkRegErr2','bkRegErr3'].forEach(id => { document.getElementById(id).textContent = ''; });
+  // Pre-fill pincode from welcome pin if saved
+  const savedPin = localStorage.getItem('kwikar_welcome_pin');
+  if (savedPin) document.getElementById('bkRegPincode').value = savedPin;
+  _bkShow('bkRegStep1');
+  setTimeout(() => document.getElementById('bkRegName').focus(), 100);
+}
+
+function bkShowLogin() {
+  document.getElementById('bkLoginErr').textContent = '';
+  _bkShow('bkLoginView');
+  setTimeout(() => document.getElementById('bkLoginPhone').focus(), 100);
+}
+
+// ── LOGIN submit ──
+async function bkLoginSubmit() {
+  const phone = document.getElementById('bkLoginPhone').value.trim().replace(/\D/g,'').slice(-10);
+  const pin   = document.getElementById('bkLoginPin').value.trim();
+  const err   = document.getElementById('bkLoginErr');
+  const btn   = document.getElementById('bkLoginBtn');
+  if (!/^\d{10}$/.test(phone)) { err.textContent = 'Sahi 10-digit number daalo'; return; }
+  if (!/^\d{4}$/.test(pin))    { err.textContent = '4-digit PIN daalo'; return; }
+  err.textContent = '';
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Verifying…';
+  try {
+    const res  = await fetch(_BASE + '/backend/user_api.php?action=login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin })
+    });
+    const data = await res.json();
+    if (!data.success) { err.textContent = data.error || 'Phone ya PIN galat hai'; return; }
+    const u = { ...(data.user || {}), role: 'user' };
+    localStorage.setItem('kwikar_user', JSON.stringify(u));
+    userName  = u.name  || '';
+    userPhone = u.phone || phone;
+    if (u.address && !document.getElementById('fullAddress').value)
+      document.getElementById('fullAddress').value = u.address;
+    if (u.pincode && !document.getElementById('pincode').value)
+      document.getElementById('pincode').value = u.pincode;
+    closeBkLoginModal();
+    showUnderstandPopup();
+  } catch(e) {
+    err.textContent = 'Server se connect nahi ho paya — dobara try karo';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// ── REGISTER step 1 ──
+function bkRegNext1() {
+  const name  = document.getElementById('bkRegName').value.trim();
+  const phone = document.getElementById('bkRegPhone').value.trim();
+  const err   = document.getElementById('bkRegErr1');
+  if (!name)                       { err.textContent = 'Naam daalna zaroori hai'; return; }
+  if (!/^\d{10}$/.test(phone))     { err.textContent = 'Sahi 10-digit number daalo'; return; }
+  err.textContent = '';
+  _bkShow('bkRegStep2');
+  setTimeout(() => document.getElementById('bkRegAddress').focus(), 100);
+}
+
+function bkRegBack1() { _bkShow('bkRegStep1'); }
+
+// ── REGISTER step 2 ──
+function bkRegNext2() {
+  const address = document.getElementById('bkRegAddress').value.trim();
+  const city    = document.getElementById('bkRegCity').value.trim();
+  const pincode = document.getElementById('bkRegPincode').value.trim();
+  const err     = document.getElementById('bkRegErr2');
+  if (!address)                     { err.textContent = 'Address daalna zaroori hai'; return; }
+  if (!city)                        { err.textContent = 'Shehar ka naam daalo'; return; }
+  if (!/^\d{6}$/.test(pincode))     { err.textContent = '6-digit pincode daalo'; return; }
+  err.textContent = '';
+  document.getElementById('bkRegPin').value = '';
+  document.getElementById('bkRegPinConfirm').value = '';
+  document.getElementById('bkRegErr3').textContent = '';
+  _bkShow('bkRegStep3');
+  setTimeout(() => document.getElementById('bkRegPin').focus(), 100);
+}
+
+function bkRegBack2() { _bkShow('bkRegStep2'); }
+
+// ── REGISTER step 3 (final submit) ──
+async function bkRegSubmit() {
+  const pin        = document.getElementById('bkRegPin').value.trim();
+  const pinConfirm = document.getElementById('bkRegPinConfirm').value.trim();
+  const err        = document.getElementById('bkRegErr3');
+  const btn        = document.getElementById('bkRegBtn');
+  if (!/^\d{4}$/.test(pin))      { err.textContent = '4-digit PIN daalo'; return; }
+  if (pin !== pinConfirm)         { err.textContent = 'Dono PIN match nahi kar rahe'; return; }
+  err.textContent = '';
+
+  const name    = document.getElementById('bkRegName').value.trim();
+  const phone   = document.getElementById('bkRegPhone').value.trim().replace(/\D/g,'').slice(-10);
+  const email   = document.getElementById('bkRegEmail').value.trim();
+  const address = document.getElementById('bkRegAddress').value.trim();
+  const city    = document.getElementById('bkRegCity').value.trim();
+  const pincode = document.getElementById('bkRegPincode').value.trim();
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    const res  = await fetch(_BASE + '/backend/user_api.php?action=register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, email, address, city, pincode, pin, role: 'user' })
+    });
+    const data = await res.json();
+    if (!data.success) { err.textContent = data.error || 'Register nahi ho paya'; return; }
+    const u = { name, phone, email, address, city, pincode, role: 'user',
+                user_id: data.user?.id || '' };
+    localStorage.setItem('kwikar_user', JSON.stringify(u));
+    localStorage.setItem('kwikar_pin_done', '1');
+    userName  = name;
+    userPhone = phone;
+    // Pre-fill address step
+    if (!document.getElementById('fullAddress').value) document.getElementById('fullAddress').value = address;
+    if (!document.getElementById('pincode').value)     document.getElementById('pincode').value     = pincode;
+    closeBkLoginModal();
+    showUnderstandPopup();
+  } catch(e) {
+    err.textContent = 'Server se connect nahi ho paya — dobara try karo';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+// Keyboard shortcuts
+document.getElementById('bkLoginPin').addEventListener('keydown',      e => { if (e.key === 'Enter') bkLoginSubmit(); });
+document.getElementById('bkLoginPhone').addEventListener('keydown',    e => { if (e.key === 'Enter') document.getElementById('bkLoginPin').focus(); });
+document.getElementById('bkRegPin').addEventListener('keydown',        e => { if (e.key === 'Enter') document.getElementById('bkRegPinConfirm').focus(); });
+document.getElementById('bkRegPinConfirm').addEventListener('keydown', e => { if (e.key === 'Enter') bkRegSubmit(); });
+
+updateHeader();
+init();
+</script>
+</body>
+</html>

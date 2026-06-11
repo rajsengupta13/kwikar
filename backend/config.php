@@ -1,22 +1,39 @@
 <?php
 /**
  * Kwikar — Database & app config.
- * Update credentials when wiring up MySQL on XAMPP.
+ * Real values come from the project root `.env` file (see .env.example).
+ * Update `.env` when wiring up MySQL — never hard-code secrets here.
  */
+
+require_once __DIR__ . '/env.php';
 
 return [
   'db' => [
-    'host' => 'localhost',
-    'name' => 'kwikar',
-    'user' => 'root',
-    'pass' => '',
-    'port' => 3306,
-    'charset' => 'utf8mb4',
+    'host'    => env('DB_HOST', 'localhost'),
+    'name'    => env('DB_DATABASE', 'kwikar_db'),
+    'user'    => env('DB_USERNAME', 'root'),
+    'pass'    => env('DB_PASSWORD', ''),
+    'port'    => (int) env('DB_PORT', 3306),
+    'charset' => env('DB_CHARSET', 'utf8mb4'),
   ],
+  'admin_secret' => env('ADMIN_SECRET', 'change-me-to-a-long-random-string'),
+
+  'mail' => [
+    'host'         => env('MAIL_HOST', ''),
+    'port'         => (int) env('MAIL_PORT', 587),
+    'username'     => env('MAIL_USERNAME', ''),
+    'password'     => env('MAIL_PASSWORD', ''),
+    'encryption'   => env('MAIL_ENCRYPTION', 'tls'),
+    'from_address' => env('MAIL_FROM_ADDRESS', ''),
+    'from_name'    => env('MAIL_FROM_NAME', 'Kwikar'),
+  ],
+
   'app' => [
-    'env' => 'development',
-    'timezone' => 'Asia/Kolkata',
-    'launch_date' => '2026-05-26',
+    'env' => env('APP_ENV', 'development'),
+    'debug' => (bool) env('APP_DEBUG', false),
+    'url' => env('APP_URL', 'http://localhost/mono-kwikar'),
+    'timezone' => env('APP_TIMEZONE', 'Asia/Kolkata'),
+    'launch_date' => env('APP_LAUNCH_DATE', '2026-05-26'),
     'service_areas' => [
       '812001' => 'Bhagalpur City Centre',
       '812002' => 'Adampur',

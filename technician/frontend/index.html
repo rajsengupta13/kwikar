@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kwikar — Technician Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="tech.css?v=20260601">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ══ TOPBAR ══ -->
+  <header class="topbar">
+    <div class="brand">
+      <h1>Kw<em>i</em>kar.in</h1>
+      <p>Technician Panel</p>
+    </div>
+    <div class="topbar-right">
+      <div class="avatar-pill" onclick="navigate('settings')">
+        <div class="av">R</div>
+        <span class="greet" id="greetWord">Good morning</span>
+      </div>
+      <button type="button" class="icon-btn" onclick="navigate('notifications')">
+        <i class="fas fa-bell"></i>
+        <span class="notif-dot" id="notifBadgeDot"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ══ CONTENT ══ -->
+  <div class="content-area">
+
+    <!-- ━━ DASHBOARD ━━ -->
+    <div class="section active" id="sec-dashboard">
+      <div class="stagger">
+
+        <div class="hero">
+          <div class="hero-name">Hello, Ravi 👋</div>
+          <div class="hero-sub" id="heroSub">Loading…</div>
+          <div class="hero-pills">
+            <div class="hero-pill">
+              <div class="hpv" id="heroPillRating">—</div>
+              <div class="hpl">Rating</div>
+            </div>
+            <div class="hero-pill">
+              <div class="hpv" id="heroPillJobs">—</div>
+              <div class="hpl">Jobs Done</div>
+            </div>
+            <div class="hero-pill">
+              <div class="hpv" id="heroPillPlan">Flex</div>
+              <div class="hpl">Active Plan</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--accent-dim);color:var(--accent);"><i class="fas fa-briefcase"></i></div>
+            <div class="stat-val" id="statJobsToday">—</div>
+            <div class="stat-lbl">Jobs Today</div>
+            <div class="stat-trend" style="color:var(--accent);"><i class="fas fa-arrow-up"></i><span id="statJobsTodaySub">—</span></div>
+            <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,26 10,18 20,22 30,10 40,14 50,4 58,8" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-rupee-sign"></i></div>
+            <div class="stat-val" id="statTodayEarnings">—</div>
+            <div class="stat-lbl">Today's Earnings</div>
+            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>Live</div>
+            <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,24 10,20 20,16 30,20 40,12 50,8 58,4" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-coins"></i></div>
+            <div class="stat-val" id="statMonthEarnings">—</div>
+            <div class="stat-lbl">This Month</div>
+            <div class="stat-trend" style="color:var(--warn);"><i class="fas fa-arrow-up"></i>This month</div>
+            <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,26 10,22 20,26 30,16 40,18 50,10 58,6" fill="none" stroke="var(--warn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--danger-dim);color:var(--danger);"><i class="fas fa-chart-pie"></i></div>
+            <div class="stat-val" id="statCompletionRate">—</div>
+            <div class="stat-lbl">Completion Rate</div>
+            <div class="stat-trend" style="color:var(--success);"><i class="fas fa-arrow-up"></i>All time</div>
+            <svg class="sparkline" width="58" height="30" viewBox="0 0 58 30"><polyline points="0,18 10,16 20,20 30,12 40,10 50,8 58,6" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+
+        <div class="quick-actions">
+          <div class="qa" onclick="navigate('jobs','new')">
+            <div class="qa-ico" style="background:var(--accent-dim);color:var(--accent);"><i class="fas fa-plus-circle"></i></div>
+            <span>New Jobs</span>
+          </div>
+          <div class="qa" onclick="navigate('earn')">
+            <div class="qa-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-wallet"></i></div>
+            <span>Wallet</span>
+          </div>
+          <div class="qa" onclick="navigate('plan')">
+            <div class="qa-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-crown"></i></div>
+            <span>Plans</span>
+          </div>
+          <div class="qa" onclick="navigate('support')">
+            <div class="qa-ico" style="background:var(--danger-dim);color:var(--danger);"><i class="fas fa-headset"></i></div>
+            <span>Support</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>Today's Schedule</h3>
+            <a href="#" onclick="navigate('jobs');return false;">See all</a>
+          </div>
+          <div id="scheduleList"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>This Week's Earnings</h3>
+            <span class="chip chip-go" id="dashWeekChip" style="display:none;"></span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="dashChart"></canvas>
+          </div>
+          <div class="month-goal">
+            <div class="month-goal-hd">
+              <span>Monthly Goal — ₹50,000</span>
+              <strong id="monthGoalPct">—% reached</strong>
+            </div>
+            <div class="prog-bar">
+              <div class="prog-fill" id="monthGoalBar" style="width:0%;background:var(--accent);"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-0">
+          <div class="card-hd">
+            <h3>Performance</h3>
+            <span class="label-sm">Last 30 days</span>
+          </div>
+          <div class="ring-wrap">
+            <svg width="104" height="104" viewBox="0 0 104 104" style="flex-shrink:0;">
+              <circle cx="52" cy="52" r="42" fill="none" stroke="#F0F0EC" stroke-width="13"/>
+              <circle cx="52" cy="52" r="42" fill="none" stroke="var(--accent)" stroke-width="13"
+                id="perfRingCircle"
+                stroke-dasharray="263.9" stroke-dashoffset="15.8"
+                stroke-linecap="round" transform="rotate(-90 52 52)"
+                style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
+              <text x="52" y="48" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="17" font-weight="700" fill="#0D1B3E" id="perfRingText">—</text>
+              <text x="52" y="63" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="#8892A4">Completion</text>
+            </svg>
+            <div class="ring-labels">
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--accent);">Completed</span>
+                <span class="rv" id="perfCompleted">—</span>
+              </div>
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--warn);">Cancelled</span>
+                <span class="rv" id="perfCancelled">—</span>
+              </div>
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--danger);">Ongoing</span>
+                <span class="rv" id="perfOngoing">—</span>
+              </div>
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--success);">Rating</span>
+                <span class="rv" id="perfRating">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ━━ JOBS ━━ -->
+    <div class="section" id="sec-jobs">
+      <div class="sec-title">My Jobs</div>
+      <div class="tabs-row" id="jobTabs">
+        <button type="button" class="tab-btn active" data-tab="new"       onclick="renderJobs('new')">New</button>
+        <button type="button" class="tab-btn"        data-tab="ongoing"   onclick="renderJobs('ongoing')">Ongoing</button>
+        <button type="button" class="tab-btn"        data-tab="completed" onclick="renderJobs('completed')">Done</button>
+      </div>
+      <div id="jobsList"></div>
+    </div>
+
+    <!-- ━━ EARNINGS ━━ -->
+    <div class="section" id="sec-earn">
+      <div class="stagger">
+
+        <div class="balance-hero">
+          <div class="bal-label">Available Balance</div>
+          <div class="bal-amount" id="earnBalance">₹—</div>
+          <div class="bal-row">
+            <div class="bal-item">
+              <div class="bi-lbl">This Month</div>
+              <div class="bi-val" id="earnMonth">₹—</div>
+            </div>
+            <div class="bal-item">
+              <div class="bi-lbl">Pending</div>
+              <div class="bi-val" id="earnPending">₹—</div>
+            </div>
+            <div class="bal-item">
+              <div class="bi-lbl">Withdrawn</div>
+              <div class="bi-val" id="earnWithdrawn">₹—</div>
+            </div>
+          </div>
+          <button type="button" class="withdraw-btn" onclick="openWithdraw()">
+            <i class="fas fa-arrow-circle-up" style="margin-right:6px;"></i>Withdraw Money
+          </button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-val" id="earnJobsCompleted">—</div>
+            <div class="stat-lbl">Jobs Completed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-hourglass-half"></i></div>
+            <div class="stat-val" id="earnPendingPayout">₹—</div>
+            <div class="stat-lbl">Pending Payout</div>
+            <div class="stat-trend" style="color:var(--text-3);font-size:9px;">Paid on 31st</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>7-Day Earnings</h3>
+            <span class="chip chip-go" id="earnWeekChip" style="display:none;"></span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="earnChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>Earnings Breakdown</h3>
+            <span class="label-sm">This month</span>
+          </div>
+          <div class="ring-wrap">
+            <svg width="110" height="110" viewBox="0 0 110 110" style="flex-shrink:0;">
+              <circle cx="55" cy="55" r="42" fill="none" stroke="#F0F0EC" stroke-width="15"/>
+              <circle cx="55" cy="55" r="42" fill="none" stroke="var(--accent)" stroke-width="15"
+                stroke-dasharray="263.9" stroke-dashoffset="60.7"
+                stroke-linecap="round" transform="rotate(-90 55 55)"/>
+              <circle cx="55" cy="55" r="42" fill="none" stroke="var(--warn)" stroke-width="15"
+                stroke-dasharray="263.9" stroke-dashoffset="203.2"
+                stroke-linecap="round" transform="rotate(139 55 55)" opacity=".75"/>
+              <text x="55" y="51" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="13" font-weight="700" fill="#0D1B3E" id="earnRingText">₹—</text>
+              <text x="55" y="65" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="#8892A4">Total</text>
+            </svg>
+            <div class="ring-labels">
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--accent);">Completed Jobs</span>
+                <span class="rv" id="earnBreakCompleted">₹—</span>
+              </div>
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--warn);">Pending</span>
+                <span class="rv" id="earnBreakPending">₹—</span>
+              </div>
+              <div class="ring-row">
+                <span class="rk" style="--c:var(--danger);">Wallet Balance</span>
+                <span class="rv" id="earnBreakBalance">₹—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-0">
+          <div class="card-hd">
+            <h3>Recent Transactions</h3>
+            <a href="#">See all</a>
+          </div>
+          <div id="txnList"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ━━ PLAN ━━ -->
+    <div class="section" id="sec-plan">
+      <div class="sec-title">Your Plan</div>
+      <p class="text-sm text-muted" style="margin-top:-10px;margin-bottom:14px;">Pick the model that fits how you work</p>
+
+      <div class="plan-blur-wrap">
+        <!-- blurred content -->
+        <div class="plan-blur-content">
+
+          <div class="plan-card">
+            <div class="plan-badge pb-dark">📍 Fix Plan</div>
+            <div class="plan-price">₹499 <span>/ pincode</span></div>
+            <div class="plan-note">One-time charge — unlimited jobs in that area</div>
+            <div style="display:flex;gap:5px;margin:10px 0;">
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--navy);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+              <div style="flex:1;height:4px;border-radius:2px;background:var(--bg-warm);"></div>
+            </div>
+            <p style="font-size:10px;color:var(--text-3);margin-bottom:10px;">1 of 5 pincodes unlocked</p>
+            <ul class="plan-feats">
+              <li><i class="fas fa-check"></i> Unlock a pincode area at ₹499</li>
+              <li><i class="fas fa-check"></i> Unlimited jobs in that pincode</li>
+              <li><i class="fas fa-check"></i> Add more pincodes at same rate</li>
+              <li><i class="fas fa-check"></i> No per-service charges after unlock</li>
+              <li><i class="fas fa-check"></i> Priority listing &amp; Verified badge</li>
+            </ul>
+            <div class="plan-hint">
+              <i class="fas fa-lightbulb" style="color:var(--warn);"></i>
+              Best for technicians with a steady local client base
+            </div>
+            <button type="button" class="btn btn-secondary" id="planFixBtn" onclick="purchaseFixPlan(this)">Get Fix Plan — ₹499</button>
+          </div>
+
+          <div class="plan-card featured">
+            <div class="plan-badge pb-blue">⚡ Flex Plan — Recommended</div>
+            <div class="plan-price">₹0 <span>first 3 services</span></div>
+            <div class="plan-note">Then ₹149 per service · No area restrictions</div>
+            <ul class="plan-feats">
+              <li><i class="fas fa-check"></i> First 3 services completely free</li>
+              <li><i class="fas fa-check"></i> ₹149 charged per service after quota</li>
+              <li><i class="fas fa-check"></i> Accept jobs from any pincode</li>
+              <li><i class="fas fa-check"></i> No upfront commitment needed</li>
+              <li><i class="fas fa-check"></i> Pay only when you do the work</li>
+            </ul>
+            <button type="button" class="btn btn-primary" id="planFlexBtn">Current Plan</button>
+          </div>
+
+          <div class="card mb-0">
+            <div class="card-hd"><h3>Quick Comparison</h3></div>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border);">
+                  <th style="text-align:left;padding:7px 0;font-weight:500;color:var(--text-3);">Feature</th>
+                  <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--navy);">Fix</th>
+                  <th style="text-align:center;padding:7px 4px;font-weight:600;color:var(--accent);">Flex</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Pricing</td><td style="text-align:center;color:var(--navy);">₹499/area</td><td style="text-align:center;color:var(--accent);">₹149/job</td></tr>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Free Quota</td><td style="text-align:center;color:var(--text-3);">—</td><td style="text-align:center;color:var(--success);">✓ 3 free</td></tr>
+                <tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 0;color:var(--text-2);">Job Limit</td><td style="text-align:center;">Unlimited</td><td style="text-align:center;">Unlimited</td></tr>
+                <tr><td style="padding:8px 0;color:var(--text-2);">Coverage</td><td style="text-align:center;">Paid areas</td><td style="text-align:center;color:var(--success);">Anywhere</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div><!-- end blur-content -->
+
+        <!-- overlay badge -->
+        <div class="plan-coming-soon">
+          <div class="plan-cs-icon">🔒</div>
+          <div class="plan-cs-title">Locked</div>
+          <div class="plan-cs-sub">Complete 3 happy jobs to unlock plan management</div>
+        </div>
+      </div><!-- end blur-wrap -->
+    </div>
+
+    <!-- ━━ NOTIFICATIONS ━━ -->
+    <div class="section" id="sec-notifications">
+      <div class="flex j-between items-c" style="margin-bottom:14px;">
+        <div class="sec-title" style="margin-bottom:0;">Alerts</div>
+        <a href="#" onclick="markAllRead();return false;" style="font-size:12px;color:var(--accent);font-weight:500;text-decoration:none;">Mark all read</a>
+      </div>
+      <div id="notifList"></div>
+    </div>
+
+    <!-- ━━ SUPPORT ━━ -->
+    <div class="section" id="sec-support">
+      <div class="sec-title">Support</div>
+      <p class="text-sm text-muted" style="margin-top:-10px;margin-bottom:14px;">How can we help you today?</p>
+      <div class="support-grid">
+        <div class="support-card" onclick="showSnack('Opening live chat…')">
+          <div class="sc-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-comment-dots"></i></div>
+          <div class="sc-title">Live Chat</div>
+          <div class="sc-desc">Instant help from our team</div>
+        </div>
+        <div class="support-card" onclick="showSnack('Connecting call…')">
+          <div class="sc-ico" style="background:var(--accent-dim);color:var(--accent);"><i class="fas fa-phone"></i></div>
+          <div class="sc-title">Call Us</div>
+          <div class="sc-desc">Speak with an executive</div>
+        </div>
+        <div class="support-card" onclick="openTicket()">
+          <div class="sc-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-ticket-alt"></i></div>
+          <div class="sc-title">Raise Ticket</div>
+          <div class="sc-desc">Submit an issue — we respond fast</div>
+        </div>
+        <div class="support-card" onclick="showSnack('Opening FAQs…')">
+          <div class="sc-ico" style="background:var(--danger-dim);color:var(--danger);"><i class="fas fa-question-circle"></i></div>
+          <div class="sc-title">FAQs</div>
+          <div class="sc-desc">Quick answers to common questions</div>
+        </div>
+      </div>
+      <div class="card mb-0">
+        <div class="card-hd"><h3>Popular Topics</h3></div>
+        <div class="settings-row" onclick="showSnack('Help: How to accept a job')"><span style="font-size:12px;color:var(--text-2);">How to accept a job?</span><i class="fas fa-chevron-right chev"></i></div>
+        <div class="settings-row" onclick="showSnack('Help: Earnings calculation')"><span style="font-size:12px;color:var(--text-2);">How are my earnings calculated?</span><i class="fas fa-chevron-right chev"></i></div>
+        <div class="settings-row" onclick="showSnack('Help: Payout timing')"><span style="font-size:12px;color:var(--text-2);">When will I receive my payout?</span><i class="fas fa-chevron-right chev"></i></div>
+        <div class="settings-row" onclick="showSnack('Help: Changing plan')" style="border-bottom:none;"><span style="font-size:12px;color:var(--text-2);">How do I switch my plan?</span><i class="fas fa-chevron-right chev"></i></div>
+      </div>
+    </div>
+
+    <!-- ━━ SETTINGS ━━ -->
+    <div class="section" id="sec-settings">
+
+      <div class="profile-wrap">
+        <div class="profile-av" onclick="showSnack('Upload photo coming soon')">
+          R
+          <div class="cam"><i class="fas fa-camera"></i></div>
+        </div>
+        <div class="profile-name">Ravi Kumar</div>
+        <div class="profile-email">ravi.kumar@example.com</div>
+        <div class="stars">
+          <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+          <i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i>
+          <span style="font-size:10px;color:var(--text-3);margin-left:5px;">4.8 · 127 reviews</span>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-bottom:14px;">
+        <span class="chip chip-go" style="font-size:11px;padding:5px 14px;">⚡ Flex Plan · Active</span>
+      </div>
+
+      <div class="card">
+        <div class="settings-row" onclick="openSettings('profile')">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--accent-dim);color:var(--accent);"><i class="fas fa-user"></i></div>
+            <div><div class="sr-title">Profile Settings</div><div class="sr-sub">Name, photo, category, location</div></div>
+          </div>
+          <i class="fas fa-chevron-right chev"></i>
+        </div>
+        <div class="settings-row" onclick="openSettings('bank')">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--success-dim);color:var(--success);"><i class="fas fa-university"></i></div>
+            <div><div class="sr-title">Bank Details</div><div class="sr-sub">Account, IFSC, UPI ID</div></div>
+          </div>
+          <i class="fas fa-chevron-right chev"></i>
+        </div>
+        <div class="settings-row" onclick="openSettings('app')">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-sliders-h"></i></div>
+            <div><div class="sr-title">App Preferences</div><div class="sr-sub">Language, alerts, offline mode</div></div>
+          </div>
+          <i class="fas fa-chevron-right chev"></i>
+        </div>
+        <div class="settings-row" onclick="openSettings('security')">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--danger-dim);color:var(--danger);"><i class="fas fa-shield-alt"></i></div>
+            <div><div class="sr-title">Privacy &amp; Security</div><div class="sr-sub">2FA, password, login activity</div></div>
+          </div>
+          <i class="fas fa-chevron-right chev"></i>
+        </div>
+        <div class="settings-row" onclick="navigate('plan')">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--warn-dim);color:var(--warn);"><i class="fas fa-crown"></i></div>
+            <div><div class="sr-title">My Plan</div><div class="sr-sub">Flex Plan · Manage pincodes</div></div>
+          </div>
+          <i class="fas fa-chevron-right chev"></i>
+        </div>
+        <div class="settings-row" style="cursor:default;">
+          <div class="sr-left">
+            <div class="sr-ico" style="background:var(--bg);color:var(--text-3);"><i class="fas fa-bell"></i></div>
+            <div><div class="sr-title">Notifications</div><div class="sr-sub">Push &amp; SMS alerts</div></div>
+          </div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+
+      <div class="card logout-card" onclick="logout()">
+        <div class="sr-left">
+          <div class="sr-ico" style="background:rgba(220,38,38,.10);color:var(--danger);"><i class="fas fa-sign-out-alt"></i></div>
+          <div>
+            <div class="sr-title" style="color:var(--danger);">Logout</div>
+            <div class="sr-sub">Sign out of your account</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card danger-zone">
+        <h4>Danger Zone</h4>
+        <p class="text-xs text-muted" style="margin-bottom:10px;">These actions are permanent and cannot be undone.</p>
+        <button type="button" style="background:rgba(220,38,38,.08);color:var(--danger);border:none;border-radius:var(--r-s);padding:10px;font-size:12px;font-weight:600;width:100%;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="showSnack('Please contact support to delete your account')">
+          Delete Account
+        </button>
+      </div>
+
+      <p style="text-align:center;font-size:10px;color:var(--text-3);padding:6px 0 20px;">
+        Kwikar Technician v1.0.0 · © 2026 Kwikar Technologies
+      </p>
+    </div>
+
+  </div><!-- /content-area -->
+
+  <!-- ══ BOTTOM NAV ══ -->
+  <nav class="bottom-nav">
+    <div class="nav-items">
+      <button type="button" class="nav-item active" data-sec="dashboard"     onclick="navigate('dashboard')"><span class="ni"><i class="fas fa-home"></i></span><span>Home</span></button>
+      <button type="button" class="nav-item"        data-sec="jobs"          onclick="navigate('jobs')"><span class="ni"><i class="fas fa-briefcase"></i></span><span>Jobs</span></button>
+      <button type="button" class="nav-item"        data-sec="earn"          onclick="navigate('earn')"><span class="ni"><i class="fas fa-coins"></i></span><span>Earn</span></button>
+      <button type="button" class="nav-item"        data-sec="plan"          onclick="navigate('plan')"><span class="ni"><i class="fas fa-crown"></i></span><span>Plan</span></button>
+      <button type="button" class="nav-item"        data-sec="notifications" onclick="navigate('notifications')"><span class="ni"><i class="fas fa-bell"></i></span><span>Alerts</span></button>
+    </div>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- ══ MODALS ══ -->
+
+<div class="overlay" id="withdrawOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Withdraw Money</div>
+    <p class="text-sm text-muted" style="margin-bottom:14px;">Available balance: <strong style="color:var(--navy);">₹12,300</strong></p>
+    <div class="form-group">
+      <label>Enter Amount (₹)</label>
+      <input type="number" id="withdrawAmt" placeholder="0" min="1" max="12300">
+    </div>
+    <div class="flex gap-2" style="margin-bottom:16px;">
+      <button type="button" class="btn-ghost" onclick="document.getElementById('withdrawAmt').value=1000">₹1,000</button>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('withdrawAmt').value=5000">₹5,000</button>
+      <button type="button" class="btn-ghost" onclick="document.getElementById('withdrawAmt').value=12300">All</button>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" class="btn-ghost w-full" onclick="closeModal('withdrawOverlay')">Cancel</button>
+      <button type="button" class="btn btn-primary" style="margin:0;flex:1;padding:11px;" onclick="submitWithdraw()">Withdraw</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="ticketOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Raise a Ticket</div>
+    <div class="form-group">
+      <label>Subject</label>
+      <input type="text" id="ticketSubject" placeholder="Briefly describe the issue">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <textarea id="ticketDesc" rows="4" placeholder="Tell us more…"></textarea>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" class="btn-ghost w-full" onclick="closeModal('ticketOverlay')">Cancel</button>
+      <button type="button" class="btn btn-primary" style="margin:0;flex:1;padding:11px;" onclick="submitTicket()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="settingsTitle">Settings</div>
+    <div id="settingsContent"></div>
+  </div>
+</div>
+
+<!-- ══ COMPLETION CODE MODAL ══ -->
+<div class="overlay" id="completionCodeOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="cc-header">
+      <div class="cc-header-title">Enter Customer Code</div>
+      <div class="cc-header-sub">Ask the customer for their code and enter it below to close this job.</div>
+    </div>
+    <div class="cc-otp-row">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 1" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 2" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 3" placeholder="·">
+      <input class="cc-otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="Digit 4" placeholder="·">
+    </div>
+    <div class="cc-actions">
+      <button type="button" class="btn-ghost" onclick="cancelCompletionCode()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="verifyCompletionCode()">✓ Verify &amp; Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SERVICE CHARGE MODAL ══ -->
+<div class="overlay" id="chargeOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sc-icon">💰</div>
+    <div class="sc-title">Upload Service Charge</div>
+    <div class="sc-sub">Enter the amount you collected from the customer.</div>
+
+    <div class="sc-amount-wrap">
+      <span class="sc-rupee">₹</span>
+      <input type="number" id="scAmountInput" class="sc-amount-input" placeholder="0" min="0" inputmode="decimal" aria-label="Service charge amount">
+    </div>
+
+    <div class="sc-label">Payment Method</div>
+    <div class="sc-method-row">
+      <button type="button" class="sc-method active" data-method="cash" onclick="selectMethod(this)">💵 Cash</button>
+      <button type="button" class="sc-method" data-method="upi" onclick="selectMethod(this)">📲 UPI</button>
+    </div>
+
+    <div class="sc-actions">
+      <button type="button" class="btn btn-primary" id="scSubmitBtn" onclick="submitServiceCharge()">Upload Charge</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SUBSCRIPTION MODAL ══ -->
+<div class="overlay" id="subscriptionOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sub-badge">🎉 3 Free Jobs Done!</div>
+    <div class="sub-title">Choose a Plan to Continue</div>
+    <div class="sub-desc">You've completed your 3 free jobs. Subscribe to keep accepting new jobs.</div>
+
+    <div class="sub-plans">
+
+      <!-- FIX PLAN -->
+      <div class="sub-plan-card" id="fixPlanCard">
+        <div class="sub-plan-top">
+          <div class="sub-plan-name">Fix Plan</div>
+          <div class="sub-plan-price">₹499<span>/month</span></div>
+        </div>
+        <ul class="sub-plan-perks">
+          <li>✅ Unlimited job acceptance</li>
+          <li>✅ Valid for 30 days</li>
+          <li>✅ One-time monthly payment</li>
+        </ul>
+        <button type="button" class="sub-pay-btn" id="fixPayBtn" onclick="initiatePayment('fix')">
+          Pay ₹499 with Razorpay
+        </button>
+      </div>
+
+      <!-- FLEX PLAN -->
+      <div class="sub-plan-card sub-plan-flex" id="flexPlanCard">
+        <div class="sub-plan-top">
+          <div class="sub-plan-name">Flex Plan</div>
+          <div class="sub-plan-price">₹149<span>/job</span></div>
+        </div>
+        <ul class="sub-plan-perks">
+          <li>✅ Pay only when accepting</li>
+          <li>✅ No monthly commitment</li>
+          <li>✅ Best for occasional work</li>
+        </ul>
+        <button type="button" class="sub-pay-btn sub-pay-flex" id="flexPayBtn" onclick="initiatePayment('flex')">
+          Pay ₹149 with Razorpay
+        </button>
+      </div>
+
+    </div>
+    <button type="button" class="btn-ghost sub-later-btn" onclick="closeModal('subscriptionOverlay')">Maybe Later</button>
+  </div>
+</div>
+
+<div class="snackbar" id="snackbar"></div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script src="tech.js?v=20260601"></script>
+</body>
+</html>
