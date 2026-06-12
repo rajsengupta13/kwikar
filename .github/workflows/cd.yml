@@ -1,31 +1,5 @@
 name: CD — Deploy to Hostinger (SSH)
 
-# Deploys to the live Hostinger site over SSH/rsync, but ONLY when
-# a pull request from `develop` into `production` is actually MERGED
-# (the `if:` guards below reject closed-but-not-merged PRs, PRs from
-# any other branch, and direct pushes). Re-lints the merged commit
-# as a final safety net before shipping.
-#
-# ── Secret group 1: SSH connection (Settings → Secrets → Actions) ──
-# Bundled into just TWO secrets instead of four:
-#   SSH_CONNECTION   — single line "user@host:port", e.g.
-#                        u123456789@123.45.67.89:65002
-#                      (user/host/port all come from hPanel → Advanced
-#                      → SSH Access; Hostinger's SSH port is commonly 65002)
-#   SSH_PRIVATE_KEY  — the private key whose matching public key is added
-#                      under hPanel → Advanced → SSH Access → SSH Keys
-#                      (kept separate — it's a multi-line PEM block and
-#                      shouldn't be mixed with delimited text)
-#
-# ── Secret group 2: production app environment ──────────────────────
-#   ENV_FILE_PRODUCTION — the FULL contents of the production `.env`
-#                         (copy .env.example, fill in real prod values:
-#                         DB credentials, ADMIN_SECRET, RAZORPAY_* keys,
-#                         MAIL_* settings, APP_ENV=production, etc.)
-#                         Paste the whole file as one secret's value.
-#
-# ── Optional repo variable ───────────────────────────────────────────
-#   SSH_TARGET_DIR — remote deploy path (defaults to ~/public_html/)
 on:
   pull_request:
     types: [closed]
@@ -58,42 +32,51 @@ jobs:
             php -l "$file"
           done < <(find . -path ./vendor -prune -o -path ./node_modules -prune -o -name "*.php" -print0)
 
-      - name: Write production .env from secret
+      - name: Write production .env and extract Hostinger config
         run: |
-          if [ -z "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
-            echo "::error::ENV_FILE_PRODUCTION secret is not set — see workflow header for setup"
+          if [ -z "${{ secrets.PRODUCTION_ENV_FILE }}" ]; then
+            echo "::error::PRODUCTION_ENV_FILE secret is not set — see workflow header for setup"
             exit 1
           fi
-          printf '%s\n' "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+          printf '%s\n' "${{ secrets.PRODUCTION_ENV_FILE }}" > .deploy.env
 
-      - name: Parse SSH_CONNECTION ("user@host:port") into host/user/port
-        id: ssh
+          for key in HOSTINGER_HOST HOSTINGER_PORT HOSTINGER_USER HOSTINGER_PATH; do
+            value="$(sed -n "s/^$key=//p" .deploy.env | tail -n 1)"
+            if [ -z "$value" ]; then
+              echo "::error::Missing $key in PRODUCTION_ENV_FILE"
+              exit 1
+            fi
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+
+          grep -vE '^(HOSTINGER_HOST|HOSTINGER_PORT|HOSTINGER_USER|HOSTINGER_PATH)=' .deploy.env > .env
+          rm .deploy.env
+
+      - name: Setup SSH
         run: |
-          conn="${{ secrets.SSH_CONNECTION }}"
-          if [ -z "$conn" ]; then
-            echo "::error::SSH_CONNECTION secret is not set — expected format user@host:port (see workflow header)"
-            exit 1
-          fi
-          user="${conn%%@*}"
-          hostport="${conn#*@}"
-          host="${hostport%%:*}"
-          port="${hostport#*:}"
-          if [ -z "$user" ] || [ -z "$host" ] || [ -z "$port" ] || [ "$host" = "$port" ]; then
-            echo "::error::SSH_CONNECTION must be in the form user@host:port"
-            exit 1
-          fi
-          echo "user=$user"   >> "$GITHUB_OUTPUT"
-          echo "host=$host"   >> "$GITHUB_OUTPUT"
-          echo "port=$port"   >> "$GITHUB_OUTPUT"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/hostinger_key
+          chmod 600 ~/.ssh/hostinger_key
+          ssh-keyscan -p "$HOSTINGER_PORT" "$HOSTINGER_HOST" >> ~/.ssh/known_hosts
 
       - name: Deploy via rsync/SSH
-        uses: easingthemes/ssh-deploy@v5.1.2
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ steps.ssh.outputs.host }}
-          REMOTE_USER: ${{ steps.ssh.outputs.user }}
-          REMOTE_PORT: ${{ steps.ssh.outputs.port }}
-          SOURCE: "./"
-          TARGET: ${{ vars.SSH_TARGET_DIR || '~/public_html/' }}
-          ARGS: "-rlgoDzvc -i --delete"
-          EXCLUDE: ".git/,.github/,.claude/,.vscode/,backend/logs/,backend/data/*.json,.env.example,.gitignore,.dockerignore,Dockerfile,docker-compose.yml,*.md,new_schema.sql,backend/schema.sql,backend/kwikar.sql,admin/backend/seed_admin.php"
+        run: |
+          rsync -rlgoDzvc --delete \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            --exclude ".claude/" \
+            --exclude ".vscode/" \
+            --exclude "backend/logs/" \
+            --exclude "backend/data/*.json" \
+            --exclude ".env.example" \
+            --exclude ".gitignore" \
+            --exclude ".dockerignore" \
+            --exclude "Dockerfile" \
+            --exclude "docker-compose.yml" \
+            --exclude "*.md" \
+            --exclude "new_schema.sql" \
+            --exclude "backend/schema.sql" \
+            --exclude "backend/kwikar.sql" \
+            --exclude "admin/backend/seed_admin.php" \
+            -e "ssh -i ~/.ssh/hostinger_key -p $HOSTINGER_PORT" \
+            ./ "$HOSTINGER_USER@$HOSTINGER_HOST:$HOSTINGER_PATH"

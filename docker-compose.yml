@@ -2,10 +2,10 @@
 # Kwikar — local development stack
 #
 #   docker compose up -d --build
-#   App:        http://localhost:${APP_PORT:-8080}
-#   phpMyAdmin: http://localhost:${PHPMYADMIN_PORT:-8081}
+#   App: http://localhost:${APP_PORT:-8080}
 #
 # Configuration is read from `.env` (copy from .env.example first).
+# Connect to MySQL with DBeaver (or similar) at localhost:3306.
 # ═══════════════════════════════════════════════════════════════
 services:
   app:
@@ -44,18 +44,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  phpmyadmin:
-    image: phpmyadmin:latest
-    environment:
-      PMA_HOST: db
-      PMA_USER: root
-      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_change_me}
-    ports:
-      - "${PHPMYADMIN_PORT:-8081}:80"
-    depends_on:
-      - db
     restart: unless-stopped
 
 volumes:
