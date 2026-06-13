@@ -54,10 +54,19 @@ jobs:
 
       - name: Setup SSH
         run: |
+          echo "Host: '$HOSTINGER_HOST'  Port: '$HOSTINGER_PORT'  User: '$HOSTINGER_USER'"
+
           mkdir -p ~/.ssh
           echo "${{ secrets.HOSTINGER_SSH_KEY }}" > ~/.ssh/hostinger_key
           chmod 600 ~/.ssh/hostinger_key
-          ssh-keyscan -p "$HOSTINGER_PORT" "$HOSTINGER_HOST" >> ~/.ssh/known_hosts
+
+          echo "Testing raw TCP connectivity to $HOSTINGER_HOST:$HOSTINGER_PORT ..."
+          timeout 10 bash -c "cat < /dev/null > /dev/tcp/$HOSTINGER_HOST/$HOSTINGER_PORT" \
+            && echo "TCP connect: OK" \
+            || echo "TCP connect: FAILED (exit $?)"
+
+          ssh-keyscan -p "$HOSTINGER_PORT" "$HOSTINGER_HOST" >> ~/.ssh/known_hosts \
+            || echo "ssh-keyscan FAILED (exit $?) — continuing anyway"
 
       - name: Deploy via rsync/SSH
         run: |
