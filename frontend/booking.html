@@ -333,15 +333,6 @@ input,textarea,select{font-family:inherit}
 <!-- FIXED BOTTOM BUTTON -->
 <div class="bk-footer">
   <button class="bk-btn" id="mainBtn" onclick="handleContinue()">Continue →</button>
-  <div id="notifyBanner" style="display:none">
-    <div class="notify-banner">
-      <span class="notify-icon">🔔</span>
-      <div>
-        <div class="notify-title">You will be notified soon</div>
-        <div class="notify-sub">Jaise hi technician available hoga, aapko notify kar denge</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- POPUP: UNDERSTAND (2 sec) -->
@@ -640,34 +631,80 @@ function buildSchedule() {
     chip.className = 'day-chip' + (i === 0 ? ' selected' : '');
     chip.innerHTML = `<div class="day-name">${i === 0 ? 'Aaj' : DAYS_SHORT[d.getDay()]}</div><div class="day-date">${d.getDate()} ${MONTHS[d.getMonth()]}</div>`;
     const dateStr = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    chip.onclick = (function(ds) { return () => {
+    chip.onclick = (function(idx, ds) { return () => {
       document.querySelectorAll('.day-chip').forEach(c=>c.classList.remove('selected'));
       chip.classList.add('selected');
       selectedDay = ds;
-      buildSlots();
-    }; })(dateStr);
+      buildSlotsLoading();
+      fetchSlotAvailability(ds).then(() => buildSlots(idx === 0));
+    }; })(i, dateStr);
     if (i === 0) selectedDay = dateStr;
     daysContainer.appendChild(chip);
   }
-  buildSlots();
+  // Show skeleton while fetching, then build real slots
+  buildSlotsLoading();
+  fetchSlotAvailability(selectedDay).then(() => buildSlots(true));
 }
 
-function buildSlots() {
+function buildSlots(isToday) {
   const list = document.getElementById('slotsList');
+  const now = new Date();
+  const curHour = now.getHours() + now.getMinutes() / 60;
   list.innerHTML = '';
   selectedSlot = '';
   document.getElementById('mainBtn').disabled = true;
 
-  // All slots are closed — high demand mode
+  const hasTechData = Object.keys(availabilityMap).length > 0;
+
+  let firstAvail = true;
   TIME_SLOTS.forEach(slot => {
+    const pastDeadline = isToday && curHour >= (slot.start - 1.5);
+    const apiInfo = availabilityMap[slot.label];
+
+    // Determine availability
+    let techUnavailable = false;
+    let availLabel = 'Available';
+    let availClass = '';
+
+    if (pastDeadline) {
+      techUnavailable = true;
+      availLabel = 'Available Nahi';
+      availClass = ' na';
+    } else if (hasTechData && apiInfo) {
+      if (!apiInfo.available) {
+        techUnavailable = true;
+        availLabel = 'Available Nahi';
+        availClass = ' na';
+      } else {
+        availLabel = apiInfo.count === 1
+          ? '1 Technician Available'
+          : `${apiInfo.count} Technicians Available`;
+        availClass = '';
+      }
+    }
+
+    const disabled = pastDeadline || techUnavailable;
     const item = document.createElement('div');
-    item.className = 'slot-item disabled';
+    item.className = 'slot-item' + (disabled ? ' disabled' : '');
     item.innerHTML = `
       <div>
         <div class="slot-time">${slot.label}</div>
-        <div class="slot-avail na">Due to high demand all technician are busy now</div>
+        <div class="slot-avail${availClass}">${availLabel}</div>
       </div>
       <div class="slot-radio"></div>`;
+
+    if (!disabled) {
+      item.onclick = () => {
+        document.querySelectorAll('.slot-item').forEach(s => s.classList.remove('selected'));
+        item.classList.add('selected');
+        selectedSlot = slot.label;
+        document.getElementById('mainBtn').disabled = false;
+      };
+      if (firstAvail) {
+        setTimeout(() => item.click(), 50);
+        firstAvail = false;
+      }
+    }
     list.appendChild(item);
   });
 }
@@ -688,17 +725,10 @@ function showStep(n) {
   currentStep = n;
   updateHeader();
   window.scrollTo(0,0);
-  const btn    = document.getElementById('mainBtn');
-  const notify = document.getElementById('notifyBanner');
-  if (n === 2) {
-    btn.style.display    = 'none';
-    notify.style.display = '';
-  } else {
-    btn.style.display    = '';
-    notify.style.display = 'none';
-    if (n===1) { btn.textContent='Aage Bado →'; btn.disabled=false; }
-    else if (n===3) { btn.textContent='Book Karo 🚀'; btn.disabled=false; }
-  }
+  const btn = document.getElementById('mainBtn');
+  if (n===1) { btn.textContent='Aage Bado →'; btn.disabled=false; }
+  else if (n===2) { btn.textContent='Time Confirm Karo →'; btn.disabled=!selectedSlot; }
+  else if (n===3) { btn.textContent='Book Karo 🚀'; btn.disabled=false; }
 }
 
 function goBack() {

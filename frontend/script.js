@@ -424,6 +424,14 @@ function openBookingsSheet(){document.getElementById('bookingsOverlay').classLis
 function closeBookingsModal(){document.getElementById('bookingsOverlay').classList.remove('show');}
 function closeBkDetail(){document.getElementById('bkDetailOverlay').classList.remove('show');}
 
+const SLOT_RANGES={10:'10:00 AM – 12:00 PM',12:'12:00 PM – 02:00 PM',14:'02:00 PM – 04:00 PM',16:'04:00 PM – 06:00 PM',18:'06:00 PM – 08:00 PM'};
+function formatSlotRange(slotTime){
+  if(!slotTime) return '';
+  if(slotTime.includes('–')) return slotTime; // already a range label
+  const hour=parseInt(slotTime.split(':')[0],10);
+  return SLOT_RANGES[hour]||slotTime;
+}
+
 function isSlotExpired(b){
   if(!b.slot_date||!b.slot_time) return false;
   try{
@@ -502,10 +510,22 @@ function _renderBkDetail(b){
       </div>
     </div>` : '';
 
+  // Completed outcome
+  const satisfactionBlock = (status==='completed' && b.satisfaction) ? `
+    <div class="bkd-codes-wrap">
+      <div class="bkd-codes-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+        Service Outcome
+      </div>
+      <div class="bkd-code ${b.satisfaction==='happy'?'bkd-code-happy':'bkd-code-sad'}" style="width:100%">
+        <span class="bkd-code-val" style="font-size:.9rem">${b.satisfaction==='happy'?'😊 Customer Happy':'😞 Customer Sad'}</span>
+      </div>
+    </div>` : '';
+
   // Searching state
   const searchBlock=`
     <div class="bkd-searching">
-      <div class="bkd-spin"></div>
+      <video class="bkd-search-vid" width="260" height="146" src="${_BASE}/frontend/images/techsearch.mp4" autoplay loop muted playsinline preload="auto"></video>
       <div class="bkd-searching-text">Finding a technician for you</div>
       <div class="bkd-searching-sub">We'll notify you once a technician accepts your request</div>
     </div>`;
@@ -528,7 +548,7 @@ function _renderBkDetail(b){
     <div class="bkd-info-rows">
       ${b.slot_time?`<div class="bkd-info-row">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>${b.slot_time}</span>
+        <span>${formatSlotRange(b.slot_time)}</span>
       </div>`:''}
       ${b.slot_date?`<div class="bkd-info-row">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -545,7 +565,7 @@ function _renderBkDetail(b){
       <div class="bkd-issue">${b.issue}${b.other_issue?' — '+b.other_issue:''}</div>
     </div>
     <div class="bkd-body">
-      ${isCancelled ? cancelledBlock : isAccepted ? techBlock+codesBlock : expired ? expiredBlock : searchBlock}
+      ${isCancelled ? cancelledBlock : isAccepted ? techBlock+codesBlock+satisfactionBlock : expired ? expiredBlock : searchBlock}
       ${infoRows}
       ${canCancel?`<button type="button" class="bkd-cancel-btn" id="bkCancelBtn" onclick="cancelBooking(${b.id})">Cancel Booking</button>`:''}
     </div>
@@ -592,16 +612,17 @@ async function loadBookings(){
     // Render clickable cards
     list.innerHTML=json.bookings.map((b,idx)=>{
       const status=b.status||'pending';
-      const isPending=status==='pending';
+      const isPending=['new','broadcasted','pending'].includes(status);
       const isCancelled=status==='cancelled';
+      const isCompleted=status==='completed';
       const expired=isPending&&isSlotExpired(b);
-      const statusClass=isCancelled?'cancelled':!isPending?'confirmed':expired?'reschedule':'pending';
-      const statusLabel=isCancelled?'❌ Cancelled':!isPending?'✅ Confirmed':expired?'🔄 Reschedule':'⏳ Pending';
+      const statusClass=isCancelled?'cancelled':isCompleted?'done':!isPending?'confirmed':expired?'reschedule':'pending';
+      const statusLabel=isCancelled?'❌ Cancelled':isCompleted?'✅ Done':!isPending?'✅ Confirmed':expired?'🔄 Reschedule':'⏳ Pending';
       return`<div class="booking-card" style="cursor:pointer" onclick='openBkDetail(${JSON.stringify(b)})'>
         <div class="booking-service">${b.service} Service</div>
         <div class="booking-issue">${b.issue}${b.other_issue?' — '+b.other_issue:''}</div>
         <div class="booking-meta">
-          ${b.slot_time?`<span class="booking-tag">⏰ ${b.slot_time}</span>`:''}
+          ${b.slot_time?`<span class="booking-tag">⏰ ${formatSlotRange(b.slot_time)}</span>`:''}
           ${b.slot_date?`<span class="booking-tag">📅 ${b.slot_date}</span>`:''}
           <span class="booking-status ${statusClass}">${statusLabel}</span>
         </div>
@@ -884,7 +905,7 @@ async function submitLoginPin(){
       const abdData={...data.abd,phone,role:'abd'};
       localStorage.setItem('kwikar_abd',JSON.stringify(abdData));
       closeLoginModal();
-      redirectToAbdPanel(abdData.full_name||abdData.name||'',phone);
+      redirectToAbdPanel(abdData.full_name||abdData.name||'',phone,data.login_token);
       return;
     }
     const action=isTech?'verify_tech_pin':'login';
@@ -901,7 +922,7 @@ async function submitLoginPin(){
       registry[phone]=techData;
       localStorage.setItem('kwikar_tech_registry',JSON.stringify(registry));
       closeLoginModal();
-      redirectToTechPanel(techData.name,techData.phone||phone,techData.email||'',techData.skills||techData.service_category||'');
+      redirectToTechPanel(techData.name,techData.phone||phone,techData.email||'',techData.skills||techData.service_category||'',data.login_token);
     }else{
       const u={...(data.user||{}),role:'user'};
       localStorage.setItem('kwikar_user',JSON.stringify(u));
@@ -1001,9 +1022,11 @@ async function submitTechReg(){
   closeLoginModal();
   showAbdRegSuccess();
 }
-function redirectToAbdPanel(name, phone){
+function redirectToAbdPanel(name, phone, token){
   const base=_BASE+'/abd/frontend/index.html';
-  const p=new URLSearchParams({autologin:'1',name:name||'',phone:phone||''});
+  const params={autologin:'1',name:name||'',phone:phone||''};
+  if(token)params.token=token;
+  const p=new URLSearchParams(params);
   setTimeout(()=>{ window.location.href=base+'?'+p.toString(); },400);
 }
 
@@ -1126,22 +1149,24 @@ async function submitAbdSignup(){
     if(!data.success){err.textContent=data.error||'Register nahi ho paya';btn.disabled=false;btn.textContent='Submit 🚀';return;}
     localStorage.setItem('kwikar_abd',JSON.stringify({name,phone,email,area,role:'abd',id:data.abd_id}));
     _abdShowStep(5);
-    setTimeout(()=>{ closeAbdSignup(); redirectToAbdPanel(name,phone); },2200);
+    setTimeout(()=>{ closeAbdSignup(); redirectToAbdPanel(name,phone,data.login_token); },2200);
   }catch(e){
     err.textContent='Server error — dobara try karo';
     btn.disabled=false; btn.textContent='Submit 🚀';
   }
 }
 
-function redirectToTechPanel(name, phone, email, role){
+function redirectToTechPanel(name, phone, email, role, token){
   const base=_BASE+'/technician/frontend/index.html';
-  const p=new URLSearchParams({
+  const params={
     autologin:'1',
     name:name||'',
     phone:phone||'',
     email:email||'',
     role:role||'Technician'
-  });
+  };
+  if(token)params.token=token;
+  const p=new URLSearchParams(params);
   setTimeout(()=>{ window.location.href=base+'?'+p.toString(); }, 400);
 }
 
@@ -1449,12 +1474,13 @@ async function submitTechSignup(){
   if(abdRef) payload.abd_id = abdRef;
 
   // Save to database — check response properly
+  let json;
   try{
     const res  = await fetch(_BASE+'/backend/booking_api.php',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'save_technician',...payload,pin})
     });
-    const json = await res.json();
+    json = await res.json();
     if(!json.success){
       errPin.textContent = json.error || 'Registration failed. Please try again.';
       if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='Submit 🚀';}
@@ -1479,14 +1505,14 @@ async function submitTechSignup(){
   }
 
   // Show success popup then redirect to tech panel
-  window._pendingTechRedirect = {name:payload.name, phone:payload.phone, email:payload.email, skills:payload.skills};
+  window._pendingTechRedirect = {name:payload.name, phone:payload.phone, email:payload.email, skills:payload.skills, token:json.login_token};
   closeTechSignup();
   showAbdRegSuccess();
   setTimeout(()=>{
     if(window._pendingTechRedirect){
       const p=window._pendingTechRedirect;
       window._pendingTechRedirect=null;
-      redirectToTechPanel(p.name,p.phone,p.email,p.skills);
+      redirectToTechPanel(p.name,p.phone,p.email,p.skills,p.token);
     }
   },4000);
 }
@@ -2102,7 +2128,7 @@ function abdRegSuccessClose() {
   if (window._pendingTechRedirect) {
     const p = window._pendingTechRedirect;
     window._pendingTechRedirect = null;
-    redirectToTechPanel(p.name, p.phone, p.email, p.skills);
+    redirectToTechPanel(p.name, p.phone, p.email, p.skills, p.token);
   }
 }
 

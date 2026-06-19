@@ -34,6 +34,7 @@ set_exception_handler(function (Throwable $e) {
 });
 
 require_once '../config/database.php';
+require_once __DIR__ . '/../../../backend/magic_token.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -246,7 +247,11 @@ if ($module === 'register') {
     }
 
     $_SESSION['abd_id'] = $abdId;
-    echo json_encode(['success' => true, 'abd_id' => $abdId, 'message' => 'ABD registered successfully']);
+    $mt = make_magic_token('abd', $phone);
+    echo json_encode([
+        'success' => true, 'abd_id' => $abdId, 'message' => 'ABD registered successfully',
+        'login_token' => $mt['token'], 'token_expires_at' => $mt['expires_at'],
+    ]);
     exit;
 }
 
@@ -270,13 +275,23 @@ if ($module === 'login') {
     $db->prepare("UPDATE abds SET updated_at = NOW() WHERE id = ?")->execute([$u['id']]);
     $_SESSION['abd_id'] = (int) $u['id'];
 
-    echo json_encode(['success' => true, 'status' => 'success', 'abd' => buildAbdResponse($u)]);
+    $mt = make_magic_token('abd', $phone);
+    echo json_encode([
+        'success' => true, 'status' => 'success', 'abd' => buildAbdResponse($u),
+        'login_token' => $mt['token'], 'token_expires_at' => $mt['expires_at'],
+    ]);
     exit;
 }
 
+// setup_session: resumes a session using the signed token issued at login,
+// NOT a bare phone number — a phone number alone is not proof of identity.
 if ($module === 'setup_session') {
     $phone = trim($d['phone'] ?? '');
-    if (!$phone) { echo json_encode(['status' => 'error', 'message' => 'Phone required']); exit; }
+    $token = trim($d['token'] ?? '');
+    if (!$phone || !$token) { echo json_encode(['status' => 'error', 'message' => 'Login required']); exit; }
+    if (!verify_magic_token('abd', $phone, $token)) {
+        echo json_encode(['status' => 'error', 'message' => 'Session expired — please log in again']); exit;
+    }
 
     $db = dbConn();
     $u = abdByPhone($db, $phone);
@@ -296,8 +311,9 @@ if ($module === 'logout') {
 }
 
 if (!isset($_SESSION['abd_id'])) {
-    $ph = trim($_GET['_ph'] ?? '');
-    if ($ph) {
+    $ph  = trim($_GET['_ph'] ?? $d['_ph'] ?? '');
+    $tok = trim($_GET['_tok'] ?? $d['_tok'] ?? '');
+    if ($ph && $tok && verify_magic_token('abd', $ph, $tok)) {
         $row = abdByPhone(dbConn(), $ph);
         if ($row && $row['is_active']) $_SESSION['abd_id'] = (int) $row['id'];
     }

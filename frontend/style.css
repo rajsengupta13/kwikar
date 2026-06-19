@@ -892,6 +892,7 @@ body.modal-open{overflow:hidden}
 .booking-status.confirmed{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
 .booking-status.reschedule{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
 .booking-status.cancelled{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}
+.booking-status.done{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
 .bookings-empty{text-align:center;padding:40px 20px;color:#94a3b8;font-size:.82rem;line-height:1.6}
 
 /* ══ BOOK KARO CTA (in pincode result) ══ */
@@ -1442,8 +1443,7 @@ body.modal-open{overflow:hidden}
   .bkd-code-val{font-size:1.25rem;font-weight:800;letter-spacing:.08em;color:#0d1b3e}
   /* searching */
   .bkd-searching{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px;gap:8px}
-  .bkd-spin{width:44px;height:44px;border-radius:50%;border:3px solid #dce8ff;border-top-color:#1d4ed8;animation:spin 1s linear infinite}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  .bkd-search-vid{width:100%;max-width:260px;aspect-ratio:16/9;object-fit:cover;border-radius:14px;background:#f1f5f9}
   .bkd-searching-text{font-size:.84rem;font-weight:700;color:#0d1b3e;text-align:center}
   .bkd-searching-sub{font-size:.72rem;color:#94a3b8;text-align:center;line-height:1.4}
   /* sorry / expired */
