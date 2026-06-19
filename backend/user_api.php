@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once __DIR__ . '/logger.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/magic_token.php';
 
 set_exception_handler(function (Throwable $e) {
     if (!headers_sent()) http_response_code(500);
@@ -265,6 +266,7 @@ if ($action === 'get_bookings') {
             b.created_at,
             tu.name              AS technician_name,
             tu.phone             AS technician_phone,
+            b.satisfaction       AS satisfaction,
             CASE WHEN b.status IN ('accepted','assigned','arrived','ongoing')
                  THEN b.happy_code ELSE NULL END AS happy_code,
             CASE WHEN b.status IN ('accepted','assigned','arrived','ongoing')
@@ -355,7 +357,8 @@ if ($action === 'verify_tech_pin') {
         exit;
     }
     unset($t['pass_pin']);
-    echo json_encode(['success' => true, 'technician' => $t]);
+    $mt = make_magic_token('technician', $phone);
+    echo json_encode(['success' => true, 'technician' => $t, 'login_token' => $mt['token'], 'token_expires_at' => $mt['expires_at']]);
     exit;
 }
 

@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once __DIR__ . '/logger.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/magic_token.php';
 
 set_exception_handler(function (Throwable $e) {
     if (!headers_sent()) http_response_code(500);
@@ -213,14 +214,16 @@ if ($action === 'book') {
         $techs = $st->fetchAll();
 
         if ($techs) {
+            try { $pdo->exec("ALTER TABLE notifications ADD COLUMN booking_id BIGINT UNSIGNED NULL"); } catch (Exception $e) {}
+
             $broadcastStmt = $pdo->prepare("
                 INSERT IGNORE INTO booking_broadcasts
                     (booking_id, technician_id, notification_priority, is_featured_priority)
                 VALUES (?, ?, ?, ?)
             ");
             $notifStmt = $pdo->prepare("
-                INSERT INTO notifications (user_id, title, message, type)
-                SELECT u.id, ?, ?, 'booking'
+                INSERT INTO notifications (user_id, title, message, type, booking_id)
+                SELECT u.id, ?, ?, 'booking', ?
                 FROM   technicians t
                 JOIN   users u ON t.user_id = u.id
                 WHERE  t.id = ?
@@ -231,7 +234,7 @@ if ($action === 'book') {
             foreach ($techs as $tech) {
                 $priority = $tech['is_featured'] ? 2 : ($tech['priority_lead_enabled'] ? 1 : 0);
                 $broadcastStmt->execute([$bookingId, $tech['id'], $priority, (int) $tech['is_featured']]);
-                $notifStmt->execute([$nTitle, $nMsg, $tech['id']]);
+                $notifStmt->execute([$nTitle, $nMsg, $bookingId, $tech['id']]);
             }
             $broadcastCount = count($techs);
 
@@ -296,33 +299,29 @@ if ($action === 'save_technician') {
     $pinHash  = $pin !== '' ? password_hash($pin, PASSWORD_DEFAULT) : '';
     $emailVal = $email !== '' ? $email : null;
 
-    // 1. Upsert users by phone (check-then-insert avoids UNIQUE email conflicts)
-    $st = $pdo->prepare("SELECT id FROM users WHERE phone = ? LIMIT 1");
+    // 1. Check for an existing account on this phone first — this form is public and
+    //    unauthenticated, so it must never be able to take over an existing account
+    //    (flip its role, overwrite its PIN) just by knowing the phone number.
+    $st = $pdo->prepare("SELECT id, role FROM users WHERE phone = ? LIMIT 1");
     $st->execute([$phone]);
-    $userId = (int) $st->fetchColumn();
+    $existingUser = $st->fetch(PDO::FETCH_ASSOC);
 
-    if ($userId) {
-        // Already exists — update name/email/pin/role
-        $pdo->prepare("
-            UPDATE users SET name = ?, role = 'technician', status = 'active',
-                email    = COALESCE(?, email),
-                pass_pin = IF(? != '', ?, pass_pin),
-                updated_at = NOW()
-            WHERE id = ?
-        ")->execute([$name, $emailVal, $pinHash, $pinHash, $userId]);
-    } else {
-        // If email is already taken by another account, skip it (phone+PIN is enough to login)
-        if ($emailVal !== null) {
-            $chk = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ? LIMIT 1");
-            $chk->execute([$emailVal]);
-            if ((int) $chk->fetchColumn() > 0) $emailVal = null;
-        }
-        $pdo->prepare("
-            INSERT INTO users (name, phone, email, pass_pin, role, status)
-            VALUES (?, ?, ?, ?, 'technician', 'active')
-        ")->execute([$name, $phone, $emailVal, $pinHash]);
-        $userId = (int) $pdo->lastInsertId();
+    if ($existingUser) {
+        echo json_encode(['success' => false, 'error' => 'Is number se pehle se '.$existingUser['role'].' account hai — login karo']);
+        exit;
     }
+
+    // If email is already taken by another account, skip it (phone+PIN is enough to login)
+    if ($emailVal !== null) {
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = ? LIMIT 1");
+        $chk->execute([$emailVal]);
+        if ((int) $chk->fetchColumn() > 0) $emailVal = null;
+    }
+    $pdo->prepare("
+        INSERT INTO users (name, phone, email, pass_pin, role, status)
+        VALUES (?, ?, ?, ?, 'technician', 'active')
+    ")->execute([$name, $phone, $emailVal, $pinHash]);
+    $userId = (int) $pdo->lastInsertId();
 
     if (!$userId) {
         echo json_encode(['success' => false, 'error' => 'User record create nahi ho paya']);
@@ -391,7 +390,13 @@ if ($action === 'save_technician') {
     }
 
     log_info('Technician registered', ['phone' => $phone, 'user_id' => $userId, 'tech_id' => $techId, 'abd_id' => $abdId]);
-    echo json_encode(['success' => true, 'technician_id' => $techId, 'user_id' => $userId]);
+    $resp = ['success' => true, 'technician_id' => $techId, 'user_id' => $userId];
+    if ($pin !== '') {
+        $mt = make_magic_token('technician', $phone);
+        $resp['login_token']     = $mt['token'];
+        $resp['token_expires_at'] = $mt['expires_at'];
+    }
+    echo json_encode($resp);
     exit;
 }
 

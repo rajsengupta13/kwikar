@@ -25,6 +25,7 @@ function LoginPage({ onLogin }) {
       const res = await window.abdApi('login', { phone, pin });
       if (res.success) {
         sessionStorage.setItem('abd_phone', phone);
+        if (res.login_token) sessionStorage.setItem('abd_token', res.login_token);
         window.ABD_SESSION = res.abd;
         onLogin(res.abd);
       } else {
@@ -303,19 +304,23 @@ function App() {
 
   // Check existing session on mount — also handles autologin redirect from registration
   React.useEffect(() => {
-    // Priority 1: URL params from registration redirect (?autologin=1&phone=...)
+    // Priority 1: URL params from registration redirect (?autologin=1&phone=...&token=...)
     const params  = new URLSearchParams(window.location.search);
     const urlPhone = params.get('phone');
+    const urlToken = params.get('token');
     const isAutoLogin = params.get('autologin') === '1';
 
-    // Priority 2: stored phone from previous login
+    // Priority 2: stored phone+token from previous login
     const storedPhone = sessionStorage.getItem('abd_phone');
+    const storedToken = sessionStorage.getItem('abd_token');
     const phone = urlPhone || storedPhone;
+    const token = urlToken || storedToken;
 
-    if (phone) {
+    if (phone && token) {
       if (urlPhone) sessionStorage.setItem('abd_phone', urlPhone); // persist for API calls
+      if (urlToken) sessionStorage.setItem('abd_token', urlToken);
 
-      window.abdApi('setup_session', { phone })
+      window.abdApi('setup_session', { phone, token })
         .then(res => {
           if (res.status === 'success') {
             window.ABD_SESSION = res.abd;
@@ -395,6 +400,7 @@ function App() {
 
   function handleLogout() {
     sessionStorage.removeItem('abd_phone');
+    sessionStorage.removeItem('abd_token');
     window.ABD_SESSION = null;
     window.abdApi('logout', {}).catch(() => {});
     setSession(null);

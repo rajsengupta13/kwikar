@@ -55,10 +55,12 @@ window.abdApi = async function(module, bodyOrQs, method) {
   const base = window.location.pathname.replace(/\/frontend\/.*/, '') + '/backend/api/api.php';
   let url = base + '?module=' + module;
 
-  // Always attach stored phone so backend can restore session even if cookie is lost
+  // Always attach stored phone+token so backend can restore session even if cookie is lost.
+  // The token (not the bare phone) is what proves this is really that ABD partner.
   const storedPhone = sessionStorage.getItem('abd_phone');
-  if (storedPhone && module !== 'login' && module !== 'register') {
-    url += '&_ph=' + encodeURIComponent(storedPhone);
+  const storedToken = sessionStorage.getItem('abd_token');
+  if (storedPhone && storedToken && module !== 'login' && module !== 'register') {
+    url += '&_ph=' + encodeURIComponent(storedPhone) + '&_tok=' + encodeURIComponent(storedToken);
   }
 
   if (typeof bodyOrQs === 'string') url += '&' + bodyOrQs;

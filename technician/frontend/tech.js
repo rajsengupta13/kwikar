@@ -7,6 +7,7 @@
   const p = new URLSearchParams(location.search);
   if (p.get('autologin') === '1') {
     const phone = decodeURIComponent(p.get('phone') || '');
+    const token = decodeURIComponent(p.get('token') || '');
     let avatar = '', cached = null;
     try {
       avatar = localStorage.getItem('kwikar_tech_avatar_' + phone) || '';
@@ -17,6 +18,7 @@
     window._autoLoginParams = {
       name:  decodeURIComponent(p.get('name')  || '') || cached?.name  || 'Technician',
       phone: phone,
+      token: token,
       email: decodeURIComponent(p.get('email') || '') || cached?.email || '',
       role:  decodeURIComponent(p.get('role')  || '') || 'Technician',
       avatar: avatar
@@ -24,6 +26,7 @@
     try {
       localStorage.setItem('kwikar_tech_lastlogin', JSON.stringify({
         phone,
+        token,
         name:   window._autoLoginParams.name,
         email:  window._autoLoginParams.email,
         role:   window._autoLoginParams.role,
@@ -34,10 +37,10 @@
   } else {
     let last = null;
     try { last = JSON.parse(localStorage.getItem('kwikar_tech_lastlogin') || 'null'); } catch(_) {}
-    if (last?.phone) {
+    if (last?.phone && last?.token) {
       let avatar = '';
       try { avatar = last.avatar || localStorage.getItem('kwikar_tech_avatar_' + last.phone) || ''; } catch(_) {}
-      window._autoLoginParams = { name: last.name||'Technician', phone: last.phone, email: last.email||'', role: last.role||'Technician', avatar };
+      window._autoLoginParams = { name: last.name||'Technician', phone: last.phone, token: last.token, email: last.email||'', role: last.role||'Technician', avatar };
     } else {
       window.location.replace(window.location.pathname.replace(/\/technician\/.*$/, '') + '/frontend/index.html');
     }
@@ -48,6 +51,7 @@
 const TECH = {
   name:          window._autoLoginParams?.name  || 'Technician',
   phone:         window._autoLoginParams?.phone || '',
+  token:         window._autoLoginParams?.token || '',
   email:         window._autoLoginParams?.email || '',
   plan:          'Flex',
   rating:        4.8,
@@ -117,7 +121,7 @@ function navigate(sec, jobTab) {
     loadWallet().then(() => { renderTxns(); setTimeout(initEarnChart, 320); });
     chartsReady.earn = true;
   }
-  if (sec === 'jobs')          { loadJobsFromAPI().then(() => renderJobs(jobTab || currentJobTab)); }
+  if (sec === 'jobs')          { return loadJobsFromAPI().then(() => renderJobs(jobTab || currentJobTab)); }
   if (sec === 'notifications') { loadNotifsFromAPI().then(renderNotifs); }
 }
 
@@ -180,7 +184,7 @@ function renderJobs(tab) {
   }
 
   list.innerHTML = filtered.map(job => `
-    <div class="job-card">
+    <div class="job-card" data-job-id="${job.id}">
       <div class="flex j-between items-c" style="margin-bottom:8px;">
         <div>
           <div class="job-id">#${job.id}</div>
@@ -223,7 +227,7 @@ function renderNotifs() {
     return;
   }
   el.innerHTML = NOTIFS.map(n => `
-    <div class="notif-item ${n.read?'':'unread'}" onclick="markRead(${n.id})">
+    <div class="notif-item ${n.read?'':'unread'}" onclick="openNotifJob(${n.id}, ${n.booking_id || 'null'})">
       <div class="notif-emo" style="background:${n.bg||'var(--accent-dim)'};">${n.icon||'🔔'}</div>
       <div class="notif-body">
         ${n.text}
@@ -231,6 +235,20 @@ function renderNotifs() {
       </div>
     </div>
   `).join('');
+}
+
+// Tapping a job notification: mark it read, jump to Jobs, and highlight that job's card
+async function openNotifJob(notifId, bookingId) {
+  markRead(notifId);
+  if (!bookingId) return;
+  const guess = JOBS.find(j => j.id === bookingId);
+  await navigate('jobs', guess ? guess.status : 'new');
+  const card = document.querySelector(`.job-card[data-job-id="${bookingId}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('job-card-flash');
+    setTimeout(() => card.classList.remove('job-card-flash'), 1600);
+  }
 }
 
 function markRead(id) {
@@ -516,9 +534,10 @@ async function loadNotifsFromAPI() {
     const data = await res.json();
     if (data.status === 'success' && data.notifications?.length) {
       NOTIFS = data.notifications.map(n => ({
-        id:   n.id,
-        icon: n.type==='job'?'💼':n.type==='earning'?'💰':'📣',
-        bg:   n.type==='job'?'var(--accent-dim)':n.type==='earning'?'var(--success-dim)':'var(--bg)',
+        id:         n.id,
+        booking_id: n.booking_id ? parseInt(n.booking_id) : null,
+        icon: n.type==='booking'?'💼':n.type==='earning'?'💰':'📣',
+        bg:   n.type==='booking'?'var(--accent-dim)':n.type==='earning'?'var(--success-dim)':'var(--bg)',
         text: `<strong>${n.title}</strong> ${n.message||''}`,
         time: n.created_at || '',
         read: !!parseInt(n.is_read)
@@ -1141,11 +1160,11 @@ async function bootApp() {
     }
   }
 
-  if (TECH.phone) {
+  if (TECH.phone && TECH.token) {
     try {
       const res  = await fetch(API+'?module=setup_session', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({phone: TECH.phone})
+        body: JSON.stringify({phone: TECH.phone, token: TECH.token})
       });
       const data = await res.json();
       if (data.status === 'success' && data.tech) {
@@ -1157,6 +1176,12 @@ async function bootApp() {
         }
         if (data.tech.email) TECH.email = data.tech.email;
         if (data.tech.service_category) TECH.role = data.tech.service_category;
+      } else {
+        // Token missing/expired — bounce back to the real login instead of
+        // showing a broken dashboard with every API call failing 401.
+        try { localStorage.removeItem('kwikar_tech_lastlogin'); } catch(_) {}
+        window.location.replace(window.location.pathname.replace(/\/technician\/.*$/, '') + '/frontend/index.html');
+        return;
       }
     } catch(e) {}
 

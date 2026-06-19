@@ -533,11 +533,172 @@ switch ($module) {
 
     case 'stats_live':
         // Wrap in try/catch — tables may not exist yet on fresh install
-        $online = 0; $live = 0; $today = 0;
+        $online = 0; $live = 0; $today = 0; $activeAbds = 0; $openBookings = 0; $pendingAlerts = 0; $eventsPerMin = 0;
         try { $online = (int)$db->query("SELECT COUNT(*) FROM technicians WHERE availability_status='online'")->fetchColumn(); } catch(Throwable $e) {}
         try { $live   = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE status IN ('ongoing','assigned','arrived')")->fetchColumn(); } catch(Throwable $e) {}
         try { $today  = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE DATE(created_at)=CURDATE()")->fetchColumn(); } catch(Throwable $e) {}
-        echo json_encode(['status' => 'success', 'success' => true, 'online_techs' => $online, 'live_services' => $live, 'bookings_today' => $today]);
+        try { $activeAbds = (int)$db->query("SELECT COUNT(*) FROM abds WHERE status='active'")->fetchColumn(); } catch(Throwable $e) {}
+        try { $openBookings = (int)$db->query("SELECT COUNT(*) FROM bookings WHERE status NOT IN ('completed','cancelled')")->fetchColumn(); } catch(Throwable $e) {}
+        try { $pendingAlerts = (int)$db->query("SELECT COUNT(*) FROM support_tickets WHERE status='open'")->fetchColumn(); } catch(Throwable $e) {}
+        try {
+            $recent = 0;
+            foreach ([
+                "SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM bookings WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM booking_status_logs WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM withdrawal_requests WHERE processed_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM referral_relationships WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM technician_subscriptions WHERE created_at >= NOW() - INTERVAL 5 MINUTE AND payment_status='paid'",
+                "SELECT COUNT(*) FROM feature_boost_purchases WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+                "SELECT COUNT(*) FROM support_tickets WHERE created_at >= NOW() - INTERVAL 5 MINUTE",
+            ] as $q) {
+                try { $recent += (int)$db->query($q)->fetchColumn(); } catch (Throwable $e) {}
+            }
+            $eventsPerMin = (int) round($recent / 5);
+        } catch (Throwable $e) {}
+        echo json_encode([
+            'status' => 'success', 'success' => true,
+            'online_techs' => $online, 'live_services' => $live, 'bookings_today' => $today,
+            'active_abds' => $activeAbds, 'open_bookings' => $openBookings,
+            'pending_alerts' => $pendingAlerts, 'events_per_min' => $eventsPerMin,
+        ]);
+        break;
+
+    case 'live_feed':
+        // Unified real-activity stream for the Live Activity page — merges several
+        // tables into one timeline instead of simulating fake events client-side.
+        $since  = trim((string)($_GET['since'] ?? ''));
+        $perSrc = $since !== '' ? 25 : 15;
+        $events = [];
+
+        // Runs $sql (which must end with "...WHERE <flag>" so "AND <col> > ?" can be
+        // appended) with an optional since-bound param, then LIMIT $perSrc.
+        $runSince = function(PDO $db, string $sql, string $col, string $since, int $perSrc): array {
+            $params = [];
+            if ($since !== '') { $sql .= " AND $col > ?"; $params[] = $since; }
+            $sql .= " ORDER BY $col DESC LIMIT $perSrc";
+            $st = $db->prepare($sql);
+            $st->execute($params);
+            return $st->fetchAll();
+        };
+
+        try {
+            $rows = $runSince($db,
+                "SELECT id, name, role, created_at FROM users WHERE role IN ('customer','technician','abd')",
+                'created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'reg-'.$r['id'], 'type'=>'register', 'created_at'=>$r['created_at'], 'zone'=>'', 'amount'=>0,
+                    'msg'=>"{$r['name']} registered as a new ".ucfirst($r['role'])];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT b.id, b.booking_code, b.final_amount, b.created_at, cu.name AS customer_name,
+                        s.name AS service_name, p.city
+                 FROM bookings b
+                 JOIN customers c ON b.customer_id=c.id JOIN users cu ON c.user_id=cu.id
+                 JOIN services s ON b.service_id=s.id
+                 JOIN addresses a ON b.address_id=a.id JOIN pincodes p ON a.pincode_id=p.id
+                 WHERE 1=1",
+                'b.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'bk-'.$r['id'], 'type'=>'booking', 'created_at'=>$r['created_at'], 'zone'=>$r['city'], 'amount'=>(float)($r['final_amount'] ?? 0),
+                    'msg'=>"{$r['customer_name']} booked {$r['service_name']} in {$r['city']} (#{$r['booking_code']})"];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT bsl.id, bsl.status, bsl.note, bsl.created_at, b.booking_code,
+                        tu.name AS tech_name, p.city
+                 FROM booking_status_logs bsl
+                 JOIN bookings b ON bsl.booking_id=b.id
+                 LEFT JOIN technicians t ON b.assigned_technician_id=t.id
+                 LEFT JOIN users tu ON t.user_id=tu.id
+                 JOIN addresses a ON b.address_id=a.id JOIN pincodes p ON a.pincode_id=p.id
+                 WHERE bsl.status IN ('accepted','cancelled')",
+                'bsl.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                if ($r['status'] === 'accepted') {
+                    $events[] = ['id'=>'sl-'.$r['id'], 'type'=>'accept', 'created_at'=>$r['created_at'], 'zone'=>$r['city'], 'amount'=>0,
+                        'msg'=>($r['tech_name'] ?? 'A technician')." accepted booking #{$r['booking_code']}"];
+                } else {
+                    $events[] = ['id'=>'sl-'.$r['id'], 'type'=>'cancel', 'created_at'=>$r['created_at'], 'zone'=>$r['city'], 'amount'=>0,
+                        'msg'=>"Booking #{$r['booking_code']} cancelled".($r['note'] ? " — {$r['note']}" : '')];
+                }
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT wr.id, wr.amount, wr.processed_at, u.name
+                 FROM withdrawal_requests wr JOIN users u ON wr.user_id=u.id
+                 WHERE wr.status='paid' AND wr.processed_at IS NOT NULL",
+                'wr.processed_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'po-'.$r['id'], 'type'=>'payout', 'created_at'=>$r['processed_at'], 'zone'=>'', 'amount'=>(float)$r['amount'],
+                    'msg'=>"Payout processed for {$r['name']}"];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT rr.id, rr.relationship_type, rr.created_at, au.name AS abd_name, tu.name AS tech_name
+                 FROM referral_relationships rr
+                 JOIN abds ab ON rr.abd_id=ab.id JOIN users au ON ab.user_id=au.id
+                 JOIN technicians t ON rr.technician_id=t.id JOIN users tu ON t.user_id=tu.id
+                 WHERE 1=1",
+                'rr.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'rf-'.$r['id'], 'type'=>'referral', 'created_at'=>$r['created_at'], 'zone'=>'', 'amount'=>0,
+                    'msg'=>"ABD {$r['abd_name']} onboarded technician {$r['tech_name']}"];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT ts.id, ts.amount_paid, ts.created_at, tu.name AS tech_name, sp.name AS plan_name
+                 FROM technician_subscriptions ts
+                 JOIN technicians t ON ts.technician_id=t.id JOIN users tu ON t.user_id=tu.id
+                 JOIN subscription_plans sp ON ts.subscription_plan_id=sp.id
+                 WHERE ts.payment_status='paid'",
+                'ts.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'sub-'.$r['id'], 'type'=>'upgrade', 'created_at'=>$r['created_at'], 'zone'=>'', 'amount'=>(float)$r['amount_paid'],
+                    'msg'=>"{$r['tech_name']} subscribed to {$r['plan_name']} plan"];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT fb.id, fb.amount, fb.created_at, tu.name AS tech_name
+                 FROM feature_boost_purchases fb
+                 JOIN technicians t ON fb.technician_id=t.id JOIN users tu ON t.user_id=tu.id
+                 WHERE 1=1",
+                'fb.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'bo-'.$r['id'], 'type'=>'boost', 'created_at'=>$r['created_at'], 'zone'=>'', 'amount'=>(float)$r['amount'],
+                    'msg'=>"Featured boost activated for {$r['tech_name']}"];
+            }
+        } catch (Throwable $e) {}
+
+        try {
+            $rows = $runSince($db,
+                "SELECT st.id, st.subject, st.priority, st.created_at, u.name
+                 FROM support_tickets st JOIN users u ON st.user_id=u.id
+                 WHERE 1=1",
+                'st.created_at', $since, $perSrc);
+            foreach ($rows as $r) {
+                $events[] = ['id'=>'tk-'.$r['id'], 'type'=>'complaint', 'created_at'=>$r['created_at'], 'zone'=>'', 'amount'=>0,
+                    'msg'=>"{$r['name']}: {$r['subject']}"];
+            }
+        } catch (Throwable $e) {}
+
+        usort($events, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
+        $events = array_slice($events, 0, 80);
+
+        echo json_encode(['status' => 'success', 'events' => $events, 'server_time' => date('Y-m-d H:i:s')]);
         break;
 
     case 'services_list':
