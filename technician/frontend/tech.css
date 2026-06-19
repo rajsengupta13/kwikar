@@ -313,6 +313,8 @@ body {
   transition: transform .14s, box-shadow .14s;
 }
 .job-card:active { transform: scale(.99); }
+.job-card-flash { box-shadow: 0 0 0 2px var(--accent), var(--shadow-sm); animation: jobFlash 1.6s ease; }
+@keyframes jobFlash { 0%,100% { background: var(--white); } 30% { background: var(--accent-dim); } }
 .job-id { font-size: 10px; color: var(--text-3); font-weight: 500; margin-bottom: 2px; }
 .job-name { font-size: 14px; font-weight: 600; color: var(--navy); }
 .job-svc { font-size: 11px; color: var(--text-2); margin-top: 1px; }
@@ -484,8 +486,11 @@ body {
   line-height: 1.5;
 }
 
-/* Plan unlocked state */
-.plan-blur-content.plan-unlocked {
+/* Plan unlocked state — pointer-events only restored while the Plan tab is
+   actually active, otherwise it leaks clicks through to whichever section
+   sits underneath (e.g. Jobs Accept/Decline buttons) since all .section
+   elements share the same position:absolute;inset:0 box. */
+.section.active .plan-blur-content.plan-unlocked {
   filter: none;
   pointer-events: auto;
   -webkit-user-select: auto;

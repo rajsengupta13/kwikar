@@ -4,6 +4,7 @@ ini_set('log_errors', '1');
 require_once __DIR__ . '/../../../backend/env.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/razorpay.php';
+require_once __DIR__ . '/../../../backend/magic_token.php';
 session_start();
 
 header('Content-Type: application/json');
@@ -23,9 +24,15 @@ $method = $_SERVER['REQUEST_METHOD'];
 $d      = $method === 'POST' ? (json_decode(file_get_contents('php://input'), true) ?? []) : [];
 
 // ── Public: setup session by phone ───────────────────────────────────────────
+// Resumes a session using the signed token issued at login (verify_tech_pin) —
+// a bare phone number is not proof of identity, the token is.
 if ($module === 'setup_session') {
     $phone = trim($d['phone'] ?? '');
-    if (!$phone) { echo json_encode(['status' => 'error', 'message' => 'Phone required']); exit; }
+    $token = trim($d['token'] ?? '');
+    if (!$phone || !$token) { echo json_encode(['status' => 'error', 'message' => 'Login required']); exit; }
+    if (!verify_magic_token('technician', $phone, $token)) {
+        echo json_encode(['status' => 'error', 'message' => 'Session expired — please log in again']); exit;
+    }
 
     $db = (new Database())->getConnection();
     $st = $db->prepare("

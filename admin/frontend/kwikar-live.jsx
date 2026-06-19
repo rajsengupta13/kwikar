@@ -9,28 +9,9 @@ const EVENT_TYPES = {
   payout:    { label:'Payout',    color:'var(--green)',  bg:'var(--green-d)',  icon:'dollar' },
   cancel:    { label:'Cancelled', color:'var(--red)',    bg:'var(--red-d)',    icon:'x' },
   complaint: { label:'Complaint', color:'var(--amber)',  bg:'var(--amber-d)',  icon:'alertCircle' },
-  fraud:     { label:'⚠ Alert',   color:'var(--red)',    bg:'var(--red-d)',    icon:'shield' },
-  offline:   { label:'Offline',   color:'var(--text3)',  bg:'rgba(255,255,255,.07)', icon:'clock' },
   boost:     { label:'Boost',     color:'var(--pink)',   bg:'var(--pink-d)',   icon:'star' },
   register:  { label:'New Signup',color:'var(--green)',  bg:'var(--green-d)',  icon:'user' },
 };
-
-const ROLE_LABELS = { customer: 'Customer', technician: 'Technician', abd: 'ABD' };
-
-const NEW_EVENTS = [
-  { id:101, type:'booking', msg:'Rohit Kumar booked Plumbing in Pune', zone:'Pune', amount:750 },
-  { id:102, type:'accept', msg:'Sanjay Gupta accepted booking #B2210', zone:'Bangalore', amount:0 },
-  { id:103, type:'fraud', msg:'Multiple login attempts on T009 — flagged', zone:'Thane', amount:0 },
-  { id:104, type:'payout', msg:'Payout ₹22,800 processed for Vivek Singh', zone:'Delhi', amount:22800 },
-  { id:105, type:'referral', msg:'ABD Rahul Gupta onboarded new tech Sandeep Rao', zone:'Delhi', amount:0 },
-  { id:106, type:'upgrade', msg:'Mohan Das upgraded from Standard to Premium', zone:'Mumbai', amount:2999 },
-  { id:107, type:'cancel', msg:'Booking #B2214 cancelled — customer request', zone:'Hyderabad', amount:0 },
-  { id:108, type:'complaint', msg:'Complaint on booking #B2198 — late arrival', zone:'Chennai', amount:0 },
-  { id:109, type:'booking', msg:'Ananya Singh booked Electrical Repair in Delhi', zone:'Delhi', amount:1200 },
-  { id:110, type:'boost', msg:'Featured boost activated for Suresh Yadav', zone:'Delhi', amount:499 },
-  { id:111, type:'offline', msg:'Arjun Patel went offline — Borivali zone', zone:'Mumbai', amount:0 },
-  { id:112, type:'accept', msg:'Rajesh Kumar accepted booking #B2216', zone:'Bangalore', amount:0 },
-];
 
 function LiveDot({ color }) {
   return (
@@ -43,9 +24,9 @@ function LiveDot({ color }) {
 
 function EventCard({ ev, isNew }) {
   const et = EVENT_TYPES[ev.type] || EVENT_TYPES.booking;
-  const timeLabel = ev.joinedAt
-    ? new Date(ev.joinedAt.replace(' ', 'T')).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
-    : tAgo(ev.time || 0);
+  const timeLabel = ev.created_at
+    ? new Date(ev.created_at.replace(' ', 'T')).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+    : '';
   return (
     <div className="kcard" style={{ padding:'12px 14px', display:'flex', alignItems:'center', gap:12, animation: isNew ? 'fadeUp .4s ease both' : 'none', borderLeft:`2px solid ${et.color}` }}>
       <div style={{ width:36, height:36, borderRadius:'50%', background: et.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -67,22 +48,33 @@ function EventCard({ ev, isNew }) {
 }
 
 function LiveStatsBar() {
-  const [ticks, setTicks] = useState(0);
-  const stats = [
-    { label:'Events/min', value: 12 + (ticks % 8), icon:'activity', color:'var(--cyan)' },
-    { label:'Live Services', value: 234 + (ticks % 12), icon:'zap', color:'var(--green)' },
-    { label:'Online Techs', value: 1892 - (ticks % 5), icon:'wrench', color:'var(--amber)' },
-    { label:'Active ABDs', value: 156, icon:'briefcase', color:'var(--purple)' },
-    { label:'Open Bookings', value: 847 + (ticks % 20), icon:'calendar', color:'var(--cyan)' },
-    { label:'Pending Alerts', value: 3 + (ticks % 3 === 0 ? 1 : 0), icon:'shield', color:'var(--red)' },
-  ];
+  const [stats, setStats] = useState(null);
+
   useEffect(() => {
-    const t = setInterval(() => setTicks(v=>v+1), 2000);
-    return () => clearInterval(t);
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const res = await window.adminApi('stats_live');
+        if (!cancelled && res && (res.status === 'success' || res.success)) setStats(res);
+      } catch (e) {}
+    };
+    pull();
+    const t = setInterval(pull, 10000);
+    return () => { cancelled = true; clearInterval(t); };
   }, []);
+
+  const cards = [
+    { label:'Events/min',    value: stats?.events_per_min   ?? 0, icon:'activity',  color:'var(--cyan)' },
+    { label:'Live Services', value: stats?.live_services    ?? 0, icon:'zap',       color:'var(--green)' },
+    { label:'Online Techs',  value: stats?.online_techs     ?? 0, icon:'wrench',    color:'var(--amber)' },
+    { label:'Active ABDs',   value: stats?.active_abds      ?? 0, icon:'briefcase', color:'var(--purple)' },
+    { label:'Open Bookings', value: stats?.open_bookings    ?? 0, icon:'calendar',  color:'var(--cyan)' },
+    { label:'Pending Alerts',value: stats?.pending_alerts   ?? 0, icon:'shield',    color:'var(--red)' },
+  ];
+
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:10, marginBottom:20 }}>
-      {stats.map(s => (
+      {cards.map(s => (
         <div key={s.label} className="kcard" style={{ padding:'14px', textAlign:'center' }}>
           <div style={{ display:'flex', justifyContent:'center', marginBottom:8 }}>
             <div style={{ width:30, height:30, borderRadius:8, background:`${s.color}1A`, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -98,64 +90,44 @@ function LiveStatsBar() {
 }
 
 function LiveActivityPage() {
-  const [events, setEvents] = useState(KEVENTS.map(e => ({ ...e, time: e.time, isNew: false })));
+  const [events, setEvents] = useState([]);
   const [filter, setFilter] = useState('all');
   const [paused, setPaused] = useState(false);
   const [newCount, setNewCount] = useState(0);
-  const idRef = useRef(200);
   const pausedRef = useRef(paused);
   useEffect(() => { pausedRef.current = paused; }, [paused]);
 
-  // Real-time feed of customer/technician/ABD signups, polled straight from the database.
+  // Real-time feed pulled straight from the database — bookings, status changes,
+  // payouts, referrals, subscriptions, boosts, support tickets and signups.
   useEffect(() => {
     let cancelled = false;
     const sinceRef = { current: null };
 
-    const pullJoins = async (isFirstLoad) => {
+    const pull = async (isFirstLoad) => {
       try {
-        const q = 'recent_joins' + (sinceRef.current ? ('&since=' + encodeURIComponent(sinceRef.current)) : '');
+        const q = 'live_feed' + (sinceRef.current ? ('&since=' + encodeURIComponent(sinceRef.current)) : '');
         const res = await window.adminApi(q);
-        if (cancelled || res.status !== 'success' || !Array.isArray(res.joins) || !res.joins.length) return;
+        if (cancelled || res.status !== 'success' || !Array.isArray(res.events)) return;
 
-        sinceRef.current = res.joins[0].created_at;
-        const joinEvents = res.joins.map(r => ({
-          id: 'join-' + r.id + '-' + r.created_at,
-          type: 'register',
-          msg: `${r.name} registered as a new ${ROLE_LABELS[r.role] || r.role}`,
-          zone: '',
-          amount: 0,
-          time: 0,
-          joinedAt: r.created_at,
-          isNew: !isFirstLoad,
-        }));
+        if (res.events.length) sinceRef.current = res.events[0].created_at;
+        else if (res.server_time) sinceRef.current = res.server_time;
+
+        const incoming = res.events.map(e => ({ ...e, isNew: !isFirstLoad }));
 
         setEvents(prev => {
           const seen = new Set();
-          const merged = [...joinEvents, ...prev].filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)));
-          return merged.slice(0, 80);
+          const merged = [...incoming, ...prev].filter(e => (seen.has(e.id) ? false : (seen.add(e.id), true)));
+          merged.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+          return merged.slice(0, 100);
         });
-        if (!isFirstLoad) setNewCount(v => v + joinEvents.length);
+        if (!isFirstLoad && incoming.length) setNewCount(v => v + incoming.length);
       } catch (e) {}
     };
 
-    pullJoins(true);
-    const t = setInterval(() => { if (!pausedRef.current) pullJoins(false); }, 15000);
+    pull(true);
+    const t = setInterval(() => { if (!pausedRef.current) pull(false); }, 8000);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
-
-  useEffect(() => {
-    if (paused) return;
-    const t = setInterval(() => {
-      const template = NEW_EVENTS[Math.floor(Math.random() * NEW_EVENTS.length)];
-      const newEv = { ...template, id: idRef.current++, time: 0, isNew: true };
-      setEvents(prev => {
-        const updated = prev.map(e => ({ ...e, time: e.time + 4, isNew: false }));
-        return [newEv, ...updated].slice(0, 60);
-      });
-      setNewCount(v => v + 1);
-    }, 4000);
-    return () => clearInterval(t);
-  }, [paused]);
 
   const filtered = filter === 'all' ? events : events.filter(e => e.type === filter);
 
@@ -170,7 +142,7 @@ function LiveActivityPage() {
               <span style={{ fontSize:11, fontWeight:600, color:'var(--red)', letterSpacing:'.04em' }}>LIVE FEED</span>
             </div>
           </div>
-          <div className="page-sub">Real-time platform event stream · live customer, technician &amp; ABD signups from the database · {newCount} events since load</div>
+          <div className="page-sub">Real-time platform event stream · bookings, payouts, referrals &amp; signups from the database · {newCount} events since load</div>
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button className="kbtn" onClick={() => setPaused(v=>!v)} style={{ background: paused ? 'var(--amber-d)' : 'var(--card)', borderColor: paused ? 'rgba(251,191,36,.3)' : 'var(--border)', color: paused ? 'var(--amber)' : 'var(--text2)' }}>
@@ -183,7 +155,7 @@ function LiveActivityPage() {
       <LiveStatsBar/>
 
       <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' }}>
-        {['all','register','booking','accept','referral','upgrade','payout','cancel','complaint','fraud','offline','boost'].map(f => (
+        {['all','register','booking','accept','referral','upgrade','payout','cancel','complaint','boost'].map(f => (
           <button key={f} className="kbtn" onClick={() => setFilter(f)}
             style={{ padding:'5px 12px', fontSize:11.5, background: filter===f ? (EVENT_TYPES[f]?.bg || 'var(--cyan-d)') : 'var(--card)', color: filter===f ? (EVENT_TYPES[f]?.color || 'var(--cyan)') : 'var(--text3)', borderColor: filter===f ? `${EVENT_TYPES[f]?.color || 'var(--cyan)'}44` : 'var(--border)' }}>
             {f === 'all' ? 'All Events' : (EVENT_TYPES[f]?.label || f)}
